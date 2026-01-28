@@ -1,0 +1,191 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+jobs:
+  build-rust:
+    name: Build Rust ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            target: x86_64-pc-windows-msvc
+            ext: .exe
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+            target: aarch64-apple-darwin
+            ext: ''
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+            target: x86_64-apple-darwin
+            ext: ''
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            target: x86_64-unknown-linux-gnu
+            ext: ''
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            target: aarch64-unknown-linux-gnu
+            ext: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust-servers -> target
+          key: ${{ matrix.target }}
+
+      - name: Build
+        working-directory: rust-servers
+        env:
+          TERMINAL_SERVER_VERSION: ${{ github.ref_name }}
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare binary
+        shell: bash
+        run: |
+          mkdir -p binaries
+          BINARY_NAME="terminal-server-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}"
+          cp "rust-servers/target/${{ matrix.target }}/release/terminal-server${{ matrix.ext }}" "binaries/${BINARY_NAME}"
+          
+          cd binaries
+          if command -v sha256sum &> /dev/null; then
+            sha256sum "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
+          else
+            shasum -a 256 "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            binaries/terminal-server-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
+            binaries/terminal-server-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}.sha256
+
+  release:
+    name: Release
+    needs: build-rust
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: 'server-*'
+          path: binaries
+          merge-multiple: true
+
+      - name: Set permissions
+        run: |
+          chmod +x binaries/terminal-server-darwin-* || true
+          chmod +x binaries/terminal-server-linux-* || true
+
+      - name: Install and build
+        run: |
+          pnpm i
+          pnpm build
+
+      - name: Prepare release assets
+        run: |
+          # BRAT 需要的三个核心文件（直接上传，不打包）
+          # main.js, manifest.json, styles.css 已在根目录
+          
+          # 设置二进制文件执行权限
+          chmod +x binaries/terminal-server-darwin-* || true
+          chmod +x binaries/terminal-server-linux-* || true
+          
+          # 创建完整包（所有平台，供手动安装）
+          mkdir -p obsidian-termy/binaries
+          cp main.js manifest.json styles.css obsidian-termy/
+          cp binaries/terminal-server-* obsidian-termy/binaries/
+          chmod +x obsidian-termy/binaries/terminal-server-darwin-* || true
+          chmod +x obsidian-termy/binaries/terminal-server-linux-* || true
+          zip -r obsidian-termy.zip obsidian-termy
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            main.js
+            manifest.json
+            styles.css
+            obsidian-termy.zip
+            binaries/terminal-server-win32-x64.exe
+            binaries/terminal-server-win32-x64.exe.sha256
+            binaries/terminal-server-darwin-arm64
+            binaries/terminal-server-darwin-arm64.sha256
+            binaries/terminal-server-darwin-x64
+            binaries/terminal-server-darwin-x64.sha256
+            binaries/terminal-server-linux-x64
+            binaries/terminal-server-linux-x64.sha256
+            binaries/terminal-server-linux-arm64
+            binaries/terminal-server-linux-arm64.sha256
+          body: |
+            ## Installation
+            
+            ### Option 1: BRAT (Recommended)
+            1. Install [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin
+            2. Add this repository: `ZyphrZero/Obsidian-Termy`
+            3. BRAT will automatically download the correct binary for your platform
+            
+            ### Option 2: Manual Installation
+            1. Download `obsidian-termy.zip` (includes all platform binaries)
+            2. Extract to `.obsidian/plugins/` directory
+            3. Restart Obsidian and enable the plugin
+            
+            ### Option 3: Platform-Specific Installation
+            1. Download the three core files: `main.js`, `manifest.json`, `styles.css`
+            2. Download the binary for your platform:
+               - Windows: `terminal-server-win32-x64.exe`
+               - macOS (Apple Silicon): `terminal-server-darwin-arm64`
+               - macOS (Intel): `terminal-server-darwin-x64`
+               - Linux (x64): `terminal-server-linux-x64`
+               - Linux (ARM64): `terminal-server-linux-arm64`
+            3. Create directory: `.obsidian/plugins/obsidian-termy/binaries/`
+            4. Place core files in `obsidian-termy/` and binary in `binaries/`
+            5. Restart Obsidian and enable the plugin
+            
+            ## Verification
+            
+            You can verify binary integrity using the provided `.sha256` files:
+            
+            ```bash
+            # Linux/macOS
+            sha256sum -c terminal-server-{platform}-{arch}.sha256
+            
+            # Windows (PowerShell)
+            Get-FileHash terminal-server-win32-x64.exe -Algorithm SHA256
+            ```
+          draft: false
+          prerelease: false

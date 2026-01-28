@@ -1,0 +1,125 @@
+name: Build Rust Server
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'rust-servers/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'rust-servers/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            target: x86_64-pc-windows-msvc
+            ext: .exe
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+            target: aarch64-apple-darwin
+            ext: ''
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+            target: x86_64-apple-darwin
+            ext: ''
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            target: x86_64-unknown-linux-gnu
+            ext: ''
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            target: aarch64-unknown-linux-gnu
+            ext: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust-servers/target/
+          key: ${{ runner.os }}-${{ matrix.arch }}-cargo-${{ matrix.target }}-${{ hashFiles('rust-servers/Cargo.lock') }}
+
+      - name: Build
+        working-directory: rust-servers
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare binary
+        shell: bash
+        run: |
+          mkdir -p binaries
+          BINARY_NAME="terminal-server-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}"
+          cp "rust-servers/target/${{ matrix.target }}/release/terminal-server${{ matrix.ext }}" "binaries/${BINARY_NAME}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-server-${{ matrix.platform }}-${{ matrix.arch }}
+          path: binaries/terminal-server-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
+
+  test:
+    name: Test ${{ matrix.platform }}-${{ matrix.arch }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            ext: .exe
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+            ext: ''
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            ext: ''
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terminal-server-${{ matrix.platform }}-${{ matrix.arch }}
+          path: binaries
+
+      - name: Test binary
+        shell: bash
+        run: |
+          BINARY="binaries/terminal-server-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}"
+          chmod +x "${BINARY}" 2>/dev/null || true
+          
+          "${BINARY}" --port 0 > output.txt 2>&1 &
+          PID=$!
+          sleep 5
+          kill $PID 2>/dev/null || true
+          
+          grep -q '"port"' output.txt && echo "✓ Server started successfully" || exit 1
