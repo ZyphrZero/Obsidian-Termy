@@ -4,7 +4,7 @@
  */
 
 import type { ColorComponent, TextComponent } from 'obsidian';
-import { Setting, Notice, Platform, setIcon } from 'obsidian';
+import { Setting, Notice, Platform, ToggleComponent, setIcon } from 'obsidian';
 import type { RendererContext } from '../types';
 import type { PresetScript, ShellType } from '../settings';
 import { 
@@ -341,6 +341,18 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
 
     scripts.forEach((script, index) => {
       const row = listEl.createDiv({ cls: 'preset-script-row' });
+
+      const toggleWrap = row.createDiv({ cls: 'preset-script-toggle' });
+      const showInStatusBar = script.showInStatusBar ?? true;
+      row.toggleClass('is-disabled', !showInStatusBar);
+      const toggle = new ToggleComponent(toggleWrap);
+      toggle.setValue(showInStatusBar);
+      toggle.toggleEl.setAttribute('aria-label', t('settingsDetails.terminal.presetScriptShowInStatusBar'));
+      toggle.onChange(async (value) => {
+        script.showInStatusBar = value;
+        row.toggleClass('is-disabled', !value);
+        await this.saveSettings();
+      });
 
       const iconEl = row.createDiv({ cls: 'preset-script-icon' });
       renderPresetScriptIcon(iconEl, script.icon || 'terminal');

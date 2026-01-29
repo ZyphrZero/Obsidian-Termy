@@ -1,7 +1,8 @@
 import type { WorkspaceLeaf } from 'obsidian';
 import { Notice, Plugin } from 'obsidian';
 import type { PresetScript, TerminalSettings } from './settings/settings';
-import { renderPresetScriptIcon } from './ui/terminal/presetScriptIcons';
+import { PresetScriptModal } from './ui/terminal/presetScriptModal';
+import { PRESET_SCRIPT_ICON_OPTIONS, renderPresetScriptIcon } from './ui/terminal/presetScriptIcons';
 import { DEFAULT_SETTINGS } from './settings/settings';
 import { TerminalSettingTab } from './settings/settingsTab';
 import type { TerminalService } from './services/terminal/terminalService';
@@ -552,6 +553,9 @@ export default class TerminalPlugin extends Plugin {
           }
           const currentScript = this.getPresetScriptById(script.id);
           if (!currentScript) return false;
+          if (!(currentScript.showInStatusBar ?? true)) {
+            return false;
+          }
           if (!checking) {
             this.runPresetScript(currentScript).catch((error) => {
               const message = error instanceof Error ? error.message : String(error);
@@ -749,6 +753,35 @@ export default class TerminalPlugin extends Plugin {
     return `preset-script-${scriptId}`;
   }
 
+  private createPresetScriptId(): string {
+    const random = Math.random().toString(36).slice(2, 8);
+    return `preset-${Date.now()}-${random}`;
+  }
+
+  private openPresetScriptCreateModal(): void {
+    const scripts = this.settings.presetScripts ?? [];
+    let newId = this.createPresetScriptId();
+    while (scripts.some(script => script.id === newId)) {
+      newId = this.createPresetScriptId();
+    }
+    const newScript: PresetScript = {
+      id: newId,
+      name: '',
+      icon: PRESET_SCRIPT_ICON_OPTIONS[0] || 'terminal',
+      command: '',
+      terminalTitle: '',
+      showInStatusBar: true,
+      autoOpenTerminal: true,
+      runInNewTerminal: false,
+    };
+    const modal = new PresetScriptModal(this.app, newScript, async (updatedScript) => {
+      scripts.push(updatedScript);
+      this.settings.presetScripts = scripts;
+      await this.saveSettings();
+    }, true);
+    modal.open();
+  }
+
   private togglePresetScriptsMenu(event: MouseEvent): void {
     if (this._presetScriptsMenuEl) {
       this.closePresetScriptsMenu();
@@ -830,19 +863,19 @@ export default class TerminalPlugin extends Plugin {
 
   private buildPresetScriptsMenu(): HTMLElement | null {
     const scripts = (this.settings.presetScripts ?? []);
+    const visibleScripts = scripts.filter(script => script.showInStatusBar ?? true);
     const menu = document.createElement('div');
     menu.className = 'preset-scripts-menu';
     menu.setAttribute('role', 'menu');
 
-    if (scripts.length === 0) {
+    if (visibleScripts.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'preset-scripts-menu-item is-disabled';
       empty.textContent = t('settingsDetails.terminal.presetScriptsEmpty');
       menu.appendChild(empty);
-      return menu;
     }
 
-    scripts.forEach((script) => {
+    visibleScripts.forEach((script) => {
       const item = document.createElement('div');
       item.className = 'preset-scripts-menu-item';
       item.setAttribute('role', 'menuitem');
@@ -867,6 +900,16 @@ export default class TerminalPlugin extends Plugin {
 
       menu.appendChild(item);
     });
+
+    const addItem = document.createElement('div');
+    addItem.className = 'preset-scripts-menu-item preset-scripts-menu-add';
+    addItem.setAttribute('role', 'menuitem');
+    addItem.textContent = `+ ${t('settingsDetails.terminal.presetScriptsAddMenu')}`;
+    addItem.addEventListener('click', () => {
+      this.closePresetScriptsMenu();
+      this.openPresetScriptCreateModal();
+    });
+    menu.appendChild(addItem);
 
     return menu;
   }

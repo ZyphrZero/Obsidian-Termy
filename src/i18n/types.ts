@@ -232,6 +232,7 @@ export interface TranslationKeys {
       presetScripts: string;
       presetScriptsDesc: string;
       presetScriptsAdd: string;
+      presetScriptsAddMenu: string;
       presetScriptsEmpty: string;
       presetScriptsUnnamed: string;
       presetScriptsEmptyCommand: string;

@@ -487,6 +487,25 @@
   background-color: var(--background-primary);
 }
 
+.preset-script-row.is-disabled {
+  opacity: 0.6;
+}
+
+.preset-script-row.is-disabled .preset-script-name,
+.preset-script-row.is-disabled .preset-script-command {
+  color: var(--text-faint);
+}
+
+.preset-script-toggle {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.preset-script-toggle .checkbox-container {
+  margin: 0;
+}
+
 .preset-script-icon {
   width: 18px;
   height: 18px;
@@ -589,6 +608,17 @@
 .preset-scripts-menu-item.is-disabled {
   color: var(--text-faint);
   cursor: default;
+}
+
+.preset-scripts-menu-item.preset-scripts-menu-add {
+  margin-top: 4px;
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 8px;
+  color: var(--text-accent);
+}
+
+.preset-scripts-menu-item.preset-scripts-menu-add:hover {
+  color: var(--text-accent-hover);
 }
 
 .preset-scripts-menu-icon {
