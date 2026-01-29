@@ -1,45 +1,77 @@
 // Shell 检测和配置
 
 use portable_pty::CommandBuilder;
+use std::env;
+use std::path::Path;
+use which::which;
 
-/// Shell Integration 脚本 (通过 PTY 注入)
-/// 使用空格前缀防止命令进入历史记录，使用重定向隐藏输出
-/// 注意: bash/zsh 默认配置不记录以空格开头的命令
-/// 仅在 Unix 平台使用，Windows 依赖前端 prompt 解析
-
-// Bash: 定义函数并设置 PROMPT_COMMAND，静默执行
-#[cfg(not(windows))]
-const SHELL_INTEGRATION_BASH: &str = " eval '__sw_cwd(){ printf \"\\e]7;file://%s%s\\e\\\\\" \"${HOSTNAME:-localhost}\" \"$PWD\";};PROMPT_COMMAND=\"__sw_cwd${PROMPT_COMMAND:+;$PROMPT_COMMAND}\"' 2>/dev/null;__sw_cwd;printf '\\ec'\n";
-
-// Zsh: 使用 precmd hook，静默执行
-#[cfg(not(windows))]
-const SHELL_INTEGRATION_ZSH: &str = " eval '__sw_cwd(){ printf \"\\e]7;file://%s%s\\e\\\\\" \"${HOST:-localhost}\" \"$PWD\";};autoload -Uz add-zsh-hook;add-zsh-hook precmd __sw_cwd;add-zsh-hook chpwd __sw_cwd' 2>/dev/null;__sw_cwd;printf '\\ec'\n";
-
-// Fish: 使用事件监听器
-#[cfg(not(windows))]
-const SHELL_INTEGRATION_FISH: &str = " eval 'function __sw_cwd --on-variable PWD; printf \"\\e]7;file://%s%s\\e\\\\\" (hostname) $PWD; end' 2>/dev/null;__sw_cwd;printf '\\ec'\n";
-
-/// 获取 Shell Integration 脚本
-/// 
-/// 注意: Windows 平台的 shell 不使用 Shell Integration，依赖前端 prompt 解析
-pub fn get_shell_integration_script(shell_type: &str) -> Option<&'static str> {
-    // Windows 平台不注入脚本
+/// 智能检测系统默认 Shell
+///
+/// 检测优先级:
+/// 1. SHELL 环境变量（用户覆盖）
+/// 2. 平台特定的智能检测
+/// 3. 安全的回退值
+pub fn detect_default_shell() -> String {
     #[cfg(windows)]
     {
-        let _ = shell_type; // 避免未使用警告
-        None
+        detect_windows_shell()
     }
-    
-    // Unix 平台使用 Shell Integration
+
     #[cfg(not(windows))]
     {
-        match shell_type {
-            "bash" => Some(SHELL_INTEGRATION_BASH),
-            "zsh" => Some(SHELL_INTEGRATION_ZSH),
-            "fish" => Some(SHELL_INTEGRATION_FISH),
-            _ => None,
+        detect_unix_shell()
+    }
+}
+
+#[cfg(windows)]
+fn detect_windows_shell() -> String {
+    // 1. 检查 SHELL 环境变量（用户覆盖，如 Git Bash 设置）
+    if let Ok(shell) = env::var("SHELL") {
+        return shell;
+    }
+
+    // 2. 优先使用 PowerShell Core (pwsh)
+    if let Ok(path) = which("pwsh") {
+        return path.to_string_lossy().into_owned();
+    }
+
+    // 3. 回退到 Windows PowerShell
+    if let Ok(path) = which("powershell") {
+        return path.to_string_lossy().into_owned();
+    }
+
+    // 4. 使用 COMSPEC 环境变量（通常是 cmd.exe）
+    if let Ok(shell) = env::var("COMSPEC") {
+        return shell;
+    }
+
+    // 5. 最后回退到 cmd.exe
+    "cmd.exe".to_string()
+}
+
+#[cfg(not(windows))]
+fn detect_unix_shell() -> String {
+    // 1. 优先使用 SHELL 环境变量
+    if let Ok(shell) = env::var("SHELL") {
+        return shell;
+    }
+
+    // 2. 检查常见 Shell（按流行度排序）
+    let shell_candidates = [
+        "/bin/zsh",  // macOS 默认
+        "/bin/bash", // Linux 常见默认
+        "/bin/fish", // 现代 Shell
+        "/bin/sh",   // POSIX 标准
+    ];
+
+    for shell in shell_candidates {
+        if Path::new(shell).exists() {
+            return shell.to_string();
         }
     }
+
+    // 3. 最后回退
+    "/bin/sh".to_string()
 }
 
 /// 根据 shell 类型获取 Shell 命令
@@ -49,9 +81,10 @@ pub fn get_shell_by_type(shell_type: Option<&str>) -> CommandBuilder {
         Some("powershell") => {
             #[cfg(windows)]
             {
-                // 优先使用 PowerShell Core (pwsh)，回退到 Windows PowerShell
-                if let Ok(pwsh_path) = which_powershell() {
-                    CommandBuilder::new(pwsh_path)
+                // 使用智能检测找到最佳 PowerShell
+                let ps_path = detect_windows_shell();
+                if ps_path.contains("pwsh") || ps_path.contains("powershell") {
+                    CommandBuilder::new(ps_path)
                 } else {
                     CommandBuilder::new("powershell.exe")
                 }
@@ -66,8 +99,8 @@ pub fn get_shell_by_type(shell_type: Option<&str>) -> CommandBuilder {
         Some("gitbash") => {
             #[cfg(windows)]
             {
-                // Git Bash: 尝试查找常见安装路径
-                if let Ok(bash_path) = which_gitbash() {
+                // Git Bash: 优先通过 PATH 查找，回退到常见安装路径
+                if let Some(bash_path) = detect_gitbash() {
                     let mut cmd = CommandBuilder::new(bash_path);
                     // 添加 --login 参数以加载用户配置
                     cmd.arg("--login");
@@ -96,79 +129,56 @@ pub fn get_shell_by_type(shell_type: Option<&str>) -> CommandBuilder {
 
 /// 获取默认 Shell 命令
 pub fn get_default_shell() -> CommandBuilder {
-    #[cfg(windows)]
-    {
-        // Windows: 默认使用 CMD
-        CommandBuilder::new("cmd.exe")
-    }
-
-    #[cfg(not(windows))]
-    {
-        // Unix: 从环境变量获取 SHELL，回退到 /bin/bash
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-        CommandBuilder::new(shell)
-    }
+    CommandBuilder::new(detect_default_shell())
 }
 
 #[cfg(windows)]
-fn which_powershell() -> Result<String, ()> {
-    // 尝试查找 PowerShell
-    let powershell_paths = vec![
-        "pwsh.exe",           // PowerShell Core
-        "powershell.exe",     // Windows PowerShell
-    ];
-
-    for path in powershell_paths {
-        if std::process::Command::new(path)
-            .arg("-Command")
-            .arg("exit")
-            .output()
-            .is_ok()
-        {
-            return Ok(path.to_string());
-        }
-    }
-
-    Err(())
-}
-
-#[cfg(windows)]
-fn which_gitbash() -> Result<String, ()> {
-    // Git Bash 常见安装路径
-    let userprofile = std::env::var("USERPROFILE").unwrap_or_default();
+fn detect_gitbash() -> Option<String> {
+    // 1. 优先检查 Git Bash 标准安装路径
+    //    这样可以避免误检测到 WSL bash（WSL bash 通常在 WindowsApps 目录）
+    let userprofile = env::var("USERPROFILE").unwrap_or_default();
     let gitbash_paths = vec![
         "C:\\Program Files\\Git\\bin\\bash.exe".to_string(),
         "C:\\Program Files (x86)\\Git\\bin\\bash.exe".to_string(),
         format!("{}\\AppData\\Local\\Programs\\Git\\bin\\bash.exe", userprofile),
     ];
 
-    // 检查路径是否存在
     for path in gitbash_paths {
-        if std::path::Path::new(&path).exists() {
-            return Ok(path);
+        if Path::new(&path).exists() {
+            return Some(path);
         }
     }
 
-    // 尝试从 PATH 环境变量查找
-    if let Ok(output) = std::process::Command::new("where")
-        .arg("bash.exe")
-        .output()
-    {
-        if output.status.success() {
-            if let Ok(stdout) = String::from_utf8(output.stdout) {
-                // 获取第一行路径
-                if let Some(first_line) = stdout.lines().next() {
-                    let path = first_line.trim();
-                    // 确保是 Git 安装的 bash
-                    if path.contains("Git") {
-                        return Ok(path.to_string());
-                    }
-                }
-            }
+    // 2. 回退：通过 PATH 查找 bash
+    //    但排除 WSL bash（通常在 WindowsApps 目录）
+    if let Ok(path) = which("bash.exe").or_else(|_| which("bash")) {
+        let path_str = path.to_string_lossy();
+        // 排除 WSL bash
+        if !path_str.contains("WindowsApps") {
+            return Some(path_str.into_owned());
         }
     }
 
-    Err(())
+    None
+}
+
+/// 获取 Shell 启动参数（用于登录 Shell 行为）
+#[allow(dead_code)]
+pub fn get_shell_login_args(shell_path: &str) -> Vec<String> {
+    let shell_name = Path::new(shell_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(shell_path)
+        .to_lowercase();
+
+    match shell_name.as_str() {
+        "bash" | "zsh" | "fish" | "sh" => vec!["-l".to_string()],
+        "pwsh" | "pwsh.exe" | "powershell" | "powershell.exe" => {
+            vec!["-NoLogo".to_string()]
+        }
+        "cmd" | "cmd.exe" => vec![],
+        _ => vec![],
+    }
 }
 
 #[cfg(test)]
@@ -181,6 +191,24 @@ mod tests {
         // 因为 CommandBuilder 没有提供公开 API 来获取程序路径
         let _shell = get_default_shell();
         // 如果能到达这里，函数工作正常
+    }
+
+    #[test]
+    fn test_detect_default_shell() {
+        let shell = detect_default_shell();
+        assert!(!shell.is_empty());
+    }
+
+    #[test]
+    fn test_get_shell_login_args() {
+        let bash_args = get_shell_login_args("/bin/bash");
+        assert_eq!(bash_args, vec!["-l".to_string()]);
+
+        let pwsh_args = get_shell_login_args("pwsh.exe");
+        assert_eq!(pwsh_args, vec!["-NoLogo".to_string()]);
+
+        let cmd_args = get_shell_login_args("cmd.exe");
+        assert!(cmd_args.is_empty());
     }
     
     #[test]

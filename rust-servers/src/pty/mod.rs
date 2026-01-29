@@ -5,7 +5,7 @@ mod session;
 mod shell;
 
 pub use session::{PtySession, PtyReader, PtyWriter};
-pub use shell::{get_shell_by_type, get_shell_integration_script, get_default_shell};
+pub use shell::{get_shell_by_type, get_default_shell};
 
 use crate::router::{ModuleHandler, ModuleMessage, ModuleType, RouterError, ServerResponse};
 use crate::server::WsSender;
@@ -159,8 +159,8 @@ impl PtyHandler {
         &self,
         session_id: String,
         reader: Arc<Mutex<PtyReader>>,
-        writer: Arc<Mutex<PtyWriter>>,
-        shell_type: Option<String>,
+        _writer: Arc<Mutex<PtyWriter>>,
+        _shell_type: Option<String>,
     ) -> Result<tokio::task::JoinHandle<()>, RouterError> {
         let ws_sender = {
             let ws_sender_guard = self.ws_sender.lock().await;
@@ -171,8 +171,6 @@ impl PtyHandler {
         
         // 启动读取任务
         let task = tokio::spawn(async move {
-            let mut first_output = true;
-            
             loop {
                 // 在阻塞任务中读取 PTY 输出
                 let reader_clone = Arc::clone(&reader);
@@ -205,21 +203,6 @@ impl PtyHandler {
                             break;
                         }
                         drop(sender);
-                        
-                        // 首次输出后注入 Shell Integration 脚本
-                        if first_output {
-                            first_output = false;
-                            if let Some(ref st) = shell_type {
-                                if let Some(script) = get_shell_integration_script(st) {
-                                    let mut w = writer.lock().unwrap();
-                                    if let Err(e) = w.write(script.as_bytes()) {
-                                        log_error!("发送 Shell Integration 脚本失败: session_id={}, {}", session_id, e);
-                                    } else {
-                                        log_debug!("Shell Integration 脚本已发送: session_id={}", session_id);
-                                    }
-                                }
-                            }
-                        }
                     }
                     Ok(Ok(_)) => {
                         // EOF - 进程退出

@@ -291,7 +291,7 @@ export const zhCN: TranslationKeys = {
   },
 
   shellTypes: {
-    cmd: '命令提示符',
+    cmd: 'CMD', 
     powershell: 'PowerShell',
     wsl: 'WSL',
     gitbash: 'Git Bash',
@@ -324,13 +324,13 @@ export const zhCN: TranslationKeys = {
   },
 
   shellOptions: {
-    cmd: '命令提示符',
+    cmd: 'Command Prompt',
     powershell: 'PowerShell',
     wsl: 'WSL',
     gitbash: 'Git Bash',
     bash: 'Bash',
     zsh: 'Zsh',
-    custom: '自定义',
+    custom: 'Custom',
   },
 
   layoutOptions: {

@@ -45,3 +45,5 @@ coverage/
 
 # ACE Tool
 .ace-tool/
+
+AGENTS.md
