@@ -3,11 +3,13 @@
 
 mod session;
 mod shell;
+mod osc_scanner;
 
 pub use session::{PtySession, PtyReader, PtyWriter};
 pub use shell::{get_shell_by_type, get_default_shell};
 
 use crate::router::{ModuleHandler, ModuleMessage, ModuleType, RouterError, ServerResponse};
+use crate::pty::osc_scanner::{OscEvent, OscScanner};
 use crate::server::WsSender;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -211,6 +213,8 @@ impl PtyHandler {
             });
 
             let mut batch_buffer: Vec<u8> = Vec::new();
+            let mut osc_scanner = OscScanner::new();
+            let mut pending_shell_events: Vec<OscEvent> = Vec::new();
 
             loop {
                 let first_event = match read_rx.recv().await {
@@ -222,7 +226,10 @@ impl PtyHandler {
                 let mut pending_error: Option<String> = None;
 
                 match first_event {
-                    ReadEvent::Data(data) => batch_buffer.extend_from_slice(&data),
+                    ReadEvent::Data(data) => {
+                        pending_shell_events.extend(osc_scanner.scan(&data));
+                        batch_buffer.extend_from_slice(&data);
+                    }
                     ReadEvent::Eof => pending_exit = true,
                     ReadEvent::Error(e) => pending_error = Some(e),
                 }
@@ -232,6 +239,7 @@ impl PtyHandler {
                     loop {
                         match time::timeout_at(deadline, read_rx.recv()).await {
                             Ok(Some(ReadEvent::Data(data))) => {
+                                pending_shell_events.extend(osc_scanner.scan(&data));
                                 batch_buffer.extend_from_slice(&data);
                             }
                             Ok(Some(ReadEvent::Eof)) => {
@@ -273,6 +281,27 @@ impl PtyHandler {
                     if let Err(e) = sender.send(Message::Binary(frame.into())).await {
                         log_error!("发送 PTY 输出失败: session_id={}, {}", session_id, e);
                         break;
+                    }
+                }
+
+                if !pending_shell_events.is_empty() {
+                    for event in pending_shell_events.drain(..) {
+                        let event_payload = serde_json::json!({
+                            "session_id": session_id,
+                            "event": event.event_name(),
+                            "source": event.source_name(),
+                            "exit_code": event.exit_code(),
+                        });
+                        let response = ServerResponse::new(
+                            ModuleType::Pty,
+                            "shell_event",
+                            event_payload,
+                        );
+                        let mut sender = ws_sender.lock().await;
+                        if let Err(e) = sender.send(Message::Text(response.to_json().into())).await {
+                            log_error!("发送 shell_event 失败: session_id={}, {}", session_id, e);
+                            break;
+                        }
                     }
                 }
 

@@ -6,7 +6,14 @@
  */
 
 import { ModuleClient } from './moduleClient';
-import type { PtyConfig, ServerMessage, SessionEventListeners } from './types';
+import type {
+  PtyConfig,
+  ServerMessage,
+  SessionEventListeners,
+  ShellEvent,
+  ShellEventSource,
+  ShellEventType,
+} from './types';
 import { debugLog, errorLog } from '@/utils/logger';
 
 /**
@@ -184,6 +191,17 @@ export class PtyClient extends ModuleClient {
   }
 
   /**
+   * 注册会话级别的 Shell 集成事件处理器
+   * 
+   * @param sessionId 会话 ID
+   * @param handler Shell 事件处理器
+   * @returns 取消注册的函数
+   */
+  onSessionShellEvent(sessionId: string, handler: (event: ShellEvent) => void): () => void {
+    return this.onSession(sessionId, 'shellEvent', handler);
+  }
+
+  /**
    * 注册会话级别事件监听器
    */
   private onSession<K extends keyof SessionEventListeners>(
@@ -197,6 +215,7 @@ export class PtyClient extends ModuleClient {
         output: new Set(),
         exit: new Set(),
         error: new Set(),
+        shellEvent: new Set(),
       });
     }
     
@@ -260,6 +279,22 @@ export class PtyClient extends ModuleClient {
   }
 
   /**
+   * 触发会话级别事件 - shell_event
+   */
+  private emitSessionShellEvent(sessionId: string, event: ShellEvent): void {
+    const listeners = this.sessionListeners.get(sessionId);
+    if (listeners) {
+      listeners.shellEvent.forEach(handler => {
+        try {
+          handler(event);
+        } catch (error) {
+          errorLog(`[PtyClient] 会话事件处理器错误 (${sessionId}/shell_event):`, error);
+        }
+      });
+    }
+  }
+
+  /**
    * 处理服务器消息
    */
   protected onMessage(msg: ServerMessage): void {
@@ -309,6 +344,15 @@ export class PtyClient extends ModuleClient {
           if (resolver) {
             resolver.reject(new Error(msg.message as string || 'PTY error'));
           }
+        }
+        break;
+
+      case 'shell_event':
+        if (sessionId && msg.event) {
+          const type = msg.event as ShellEventType;
+          const source = (msg.source as ShellEventSource) || 'osc133';
+          const exitCode = typeof msg.exit_code === 'number' ? msg.exit_code as number : null;
+          this.emitSessionShellEvent(sessionId, { type, source, exitCode });
         }
         break;
     }

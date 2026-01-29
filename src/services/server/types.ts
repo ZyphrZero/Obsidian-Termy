@@ -157,4 +157,25 @@ export interface SessionEventListeners {
   exit: Set<(code: number) => void>;
   /** 错误处理器 */
   error: Set<(code: string, message: string) => void>;
+  /** Shell 集成事件处理器 */
+  shellEvent: Set<(event: ShellEvent) => void>;
+}
+
+/**
+ * Shell 集成事件类型
+ */
+export type ShellEventType = 'prompt_start' | 'command_start' | 'command_executed' | 'command_end';
+
+/**
+ * Shell 集成事件来源
+ */
+export type ShellEventSource = 'osc133' | 'osc633';
+
+/**
+ * Shell 集成事件
+ */
+export interface ShellEvent {
+  type: ShellEventType;
+  source: ShellEventSource;
+  exitCode: number | null;
 }

@@ -10,6 +10,7 @@ import { debugLog, debugWarn, errorLog } from '@/utils/logger';
 import { t } from '@/i18n';
 import type { ServerManager } from '@/services/server/serverManager';
 import type { PtyClient } from '@/services/server/ptyClient';
+import type { ShellEvent, ShellEventSource } from '@/services/server/types';
 
 // xterm.js CSS（静态导入，esbuild 会处理）
 import '@xterm/xterm/css/xterm.css';
@@ -133,6 +134,7 @@ export class TerminalInstance {
   private outputUnsubscribe: (() => void) | null = null;
   private exitUnsubscribe: (() => void) | null = null;
   private errorUnsubscribe: (() => void) | null = null;
+  private shellEventUnsubscribe: (() => void) | null = null;
   
   private containerEl: HTMLElement | null = null;
   private options: TerminalOptions;
@@ -165,6 +167,17 @@ export class TerminalInstance {
 
   // 当前工作目录（通过 shell prompt 输出提取）
   private currentCwd: string | null = null;
+
+  // Shell 集成事件
+  private shellEventCallback: ((event: ShellEvent) => void) | null = null;
+  private commandHistory: Array<{
+    startTime: number;
+    endTime: number;
+    durationMs: number;
+    exitCode: number | null;
+    source: ShellEventSource;
+  }> = [];
+  private activeCommandStart: number | null = null;
 
   constructor(options: TerminalOptions = {}) {
     this.id = `terminal-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -366,6 +379,11 @@ export class TerminalInstance {
       errorLog('[Terminal] PTY 错误:', code, message);
       this.xterm.write(`\r\n\x1b[1;31m[错误] ${message}\x1b[0m\r\n`);
     });
+
+    // 处理 Shell 集成事件
+    this.shellEventUnsubscribe = this.ptyClient.onSessionShellEvent(this.sessionId, (event: ShellEvent) => {
+      this.handleShellEvent(event);
+    });
   }
 
   private setupXtermHandlers(): void {
@@ -501,10 +519,12 @@ export class TerminalInstance {
     this.outputUnsubscribe?.();
     this.exitUnsubscribe?.();
     this.errorUnsubscribe?.();
+    this.shellEventUnsubscribe?.();
     
     this.outputUnsubscribe = null;
     this.exitUnsubscribe = null;
     this.errorUnsubscribe = null;
+    this.shellEventUnsubscribe = null;
 
     // 销毁 PTY 会话
     if (this.ptyClient && this.sessionId) {
@@ -1197,6 +1217,50 @@ export class TerminalInstance {
    */
   isSearchVisible(): boolean {
     return this.searchVisible;
+  }
+
+  // ==================== Shell 集成 ====================
+
+  private handleShellEvent(event: ShellEvent): void {
+    if (event.type === 'command_start') {
+      this.activeCommandStart = Date.now();
+    }
+
+    if (event.type === 'command_end') {
+      const endTime = Date.now();
+      const startTime = this.activeCommandStart ?? endTime;
+      const durationMs = Math.max(0, endTime - startTime);
+      this.commandHistory.push({
+        startTime,
+        endTime,
+        durationMs,
+        exitCode: event.exitCode,
+        source: event.source,
+      });
+      this.activeCommandStart = null;
+    }
+
+    this.shellEventCallback?.(event);
+  }
+
+  /**
+   * 监听 Shell 集成事件
+   */
+  onShellEvent(callback: (event: ShellEvent) => void): void {
+    this.shellEventCallback = callback;
+  }
+
+  /**
+   * 获取命令历史
+   */
+  getCommandHistory(): Array<{
+    startTime: number;
+    endTime: number;
+    durationMs: number;
+    exitCode: number | null;
+    source: ShellEventSource;
+  }> {
+    return [...this.commandHistory];
   }
 
   // ==================== 字体大小调整 ====================
