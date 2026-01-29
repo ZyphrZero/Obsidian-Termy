@@ -129,23 +129,25 @@ export default class TerminalPlugin extends Plugin {
       this.featureVisibilityManager.cleanup();
     }
 
-    // 清理终端服务
+    // 清理终端服务（会自动清理所有终端实例）
     if (this._terminalService) {
       try {
-        // TerminalService 会自动清理所有终端实例
-        debugLog('[TerminalPlugin] Cleaning up TerminalService...');
+        debugLog('[TerminalPlugin] Shutting down TerminalService...');
+        await this._terminalService.shutdown();
+        debugLog('[TerminalPlugin] TerminalService stopped');
       } catch (error) {
-        errorLog('Failed to cleanup TerminalService:', error);
+        errorLog('[TerminalPlugin] Failed to shutdown TerminalService:', error);
       }
     }
 
     // 停止服务器
     if (this._serverManager) {
       try {
+        debugLog('[TerminalPlugin] Shutting down ServerManager...');
         await this._serverManager.shutdown();
         debugLog('[TerminalPlugin] ServerManager stopped');
       } catch (error) {
-        errorLog('Failed to stop ServerManager:', error);
+        errorLog('[TerminalPlugin] Failed to stop ServerManager:', error);
       }
     }
 

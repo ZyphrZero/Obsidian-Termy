@@ -241,6 +241,12 @@ export class TerminalService {
         errorLog(`[TerminalService] 销毁终端 ${id} 失败:`, error);
       } finally {
         this.terminals.delete(id);
+        
+        // 如果这是最后一个终端，停止服务器
+        if (this.terminals.size === 0 && !this.isShuttingDown) {
+          debugLog('[TerminalService] 最后一个终端已关闭，停止服务器');
+          await this.serverManager.shutdown();
+        }
       }
     }
   }
@@ -314,8 +320,16 @@ export class TerminalService {
   async shutdown(): Promise<void> {
     this.isShuttingDown = true;
     
+    debugLog('[TerminalService] 开始关闭终端服务');
+    
     // 销毁所有终端
     await this.destroyAllTerminals();
+    
+    // 确保服务器停止
+    if (this.serverManager.isServerRunning()) {
+      debugLog('[TerminalService] 停止服务器');
+      await this.serverManager.shutdown();
+    }
     
     debugLog('[TerminalService] 终端服务已关闭');
   }
