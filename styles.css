@@ -9,31 +9,67 @@
 .terminal-settings-header {
   display: flex;
   flex-direction: column;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .settings-title-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.settings-title-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.settings-title-icon svg {
+  display: block;
+  color: var(--text-accent);
 }
 
 .settings-title {
   margin: 0 !important;
-  padding: 0;
+  padding: 0 !important;
   font-weight: 700;
   font-size: 1.5em;
   line-height: 1;
 }
 
+.settings-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
 .settings-feedback {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .settings-feedback a {
   color: var(--text-accent);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.settings-feedback a:hover {
+  color: var(--text-accent-hover);
+  text-decoration: underline;
 }
 
 .terminal-settings-content {
@@ -503,6 +539,27 @@
 }
 
 /* ==================== Preset Scripts Status Menu ==================== */
+.terminal-status-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  transition: opacity 0.2s ease;
+}
+
+.terminal-status-bar:hover {
+  opacity: 0.8;
+}
+
+.terminal-status-bar svg {
+  flex-shrink: 0;
+}
+
+.terminal-status-bar span {
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .preset-scripts-menu {
   position: fixed;
   min-width: 220px;

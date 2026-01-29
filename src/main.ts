@@ -252,9 +252,20 @@ export default class TerminalPlugin extends Plugin {
   private initStatusBar(): void {
     this._statusBarItem = this.addStatusBarItem();
     this._statusBarItem.addClass('terminal-status-bar');
-    this._statusBarItem.setText('>_');
     this._statusBarItem.setAttr('aria-label', t('ribbon.terminalTooltip'));
     this._statusBarItem.style.cursor = 'pointer';
+    
+    // 创建 SVG icon + 文字
+    const iconSvg = `<svg width="18" height="18" viewBox="0 0 560 512" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 0px;">
+      <rect x="25" y="45" width="510" height="422" rx="45" fill="none" stroke="currentColor" stroke-width="32"/>
+      <path d="M95 385 V 125 A 15 15 0 0 1 110 110 H 450 A 15 15 0 0 1 465 125 V 385" fill="none" stroke="currentColor" stroke-width="24" stroke-linecap="round"/>
+      <g stroke="currentColor" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M210 190 L 270 245 L 210 300" fill="none"/>
+        <line x1="295" y1="300" x2="365" y2="300"/>
+      </g>
+    </svg>`;
+    
+    this._statusBarItem.innerHTML = iconSvg + '<span style="vertical-align: middle;">Termy</span>';
     
     // 添加点击事件
     this._statusBarItem.addEventListener('click', (event: MouseEvent) => {
