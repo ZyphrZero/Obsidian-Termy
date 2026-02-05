@@ -26,13 +26,13 @@
 **功能:**
 - 构建所有平台二进制 + SHA256 校验和
 - 构建 TypeScript 插件
-- 打包为 `obsidian-termy.zip`
+- 打包为 `termy.zip`
 - 创建 GitHub Release
 
 **产物结构:**
 ```
-obsidian-termy.zip
-└── obsidian-termy/
+termy.zip
+└── termy/
     ├── main.js
     ├── manifest.json
     ├── styles.css

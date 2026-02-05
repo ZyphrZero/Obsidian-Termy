@@ -317,7 +317,7 @@ async function main() {
   }
 
   // 3. Create plugin directory
-  const targetDir = path.join(pluginsDir, 'obsidian-termy');
+  const targetDir = path.join(pluginsDir, 'termy');
   
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });

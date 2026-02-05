@@ -42,8 +42,8 @@ Full terminal emulator with split panes, preset scripts, multiple shells, and na
 
 ### Manual Installation
 
-1. Download the latest release from [GitHub Releases](https://github.com/ZyphrZero/Obsidian-Termy/releases)
-2. Extract the files to your vault's .obsidian/plugins/obsidian-termy/ directory
+1. Download the latest release from [GitHub Releases](https://github.com/ZyphrZero/Termy/releases)
+2. Extract the files to your vault's .obsidian/plugins/termy/ directory
 3. Reload Obsidian
 4. Enable the plugin in Settings → Community Plugins
 
@@ -81,5 +81,5 @@ GPL-3.0 License - see [LICENSE](LICENSE) for details.
 
 ## Support
 
-- Report issues: [GitHub Issues](https://github.com/ZyphrZero/Obsidian-Termy/issues)
-- Discussions: [GitHub Discussions](https://github.com/ZyphrZero/Obsidian-Termy/discussions)
+- Report issues: [GitHub Issues](https://github.com/ZyphrZero/Termy/issues)
+- Discussions: [GitHub Discussions](https://github.com/ZyphrZero/Termy/discussions)

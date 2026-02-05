@@ -3,7 +3,7 @@
 name = "termy-server"
 version = "1.0.0"
 edition = "2021"
-description = "Terminal server for Obsidian-Termy plugin"
+description = "Terminal server for Termy plugin"
 
 [[bin]]
 name = "termy-server"

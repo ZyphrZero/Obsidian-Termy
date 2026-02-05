@@ -82,7 +82,7 @@ export class TerminalSettingTab extends PluginSettingTab {
     feedbackContainer.appendText(t('settings.header.feedbackText'));
     feedbackContainer.createEl('a', {
       text: t('settings.header.feedbackLink'),
-      href: 'https://github.com/ZyphrZero/Obsidian-Termy'
+      href: 'https://github.com/ZyphrZero/Termy'
     });
 
     const reloadBtn = actionsGroup.createEl('button', { cls: 'clickable-icon' });

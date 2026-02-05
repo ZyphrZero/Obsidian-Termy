@@ -278,7 +278,7 @@ export class TerminalView extends ItemView {
   private async createNewTerminal(): Promise<void> {
     // 触发插件的 activateTerminalView 方法
     // 通过 workspace 获取插件实例
-    const plugin = (this.app as any).plugins?.plugins?.['obsidian-termy'];
+    const plugin = (this.app as any).plugins?.plugins?.['termy'];
     if (plugin && typeof plugin.activateTerminalView === 'function') {
       await plugin.activateTerminalView();
     }
@@ -410,7 +410,7 @@ export class TerminalView extends ItemView {
   refreshAppearance(): void {
     if (!this.terminalInstance) return;
 
-    const plugin = (this.app as any).plugins?.plugins?.['obsidian-termy'];
+    const plugin = (this.app as any).plugins?.plugins?.['termy'];
     if (!plugin) return;
 
     const settings = plugin.settings;

@@ -126,12 +126,12 @@ jobs:
           chmod +x binaries/termy-server-linux-* || true
           
           # 创建完整包（所有平台，供手动安装）
-          mkdir -p obsidian-termy/binaries
-          cp main.js manifest.json styles.css obsidian-termy/
-          cp binaries/termy-server-* obsidian-termy/binaries/
-          chmod +x obsidian-termy/binaries/termy-server-darwin-* || true
-          chmod +x obsidian-termy/binaries/termy-server-linux-* || true
-          zip -r obsidian-termy.zip obsidian-termy
+          mkdir -p termy/binaries
+          cp main.js manifest.json styles.css termy/
+          cp binaries/termy-server-* termy/binaries/
+          chmod +x termy/binaries/termy-server-darwin-* || true
+          chmod +x termy/binaries/termy-server-linux-* || true
+          zip -r termy.zip termy
 
       - name: Release
         uses: softprops/action-gh-release@v2
@@ -140,7 +140,7 @@ jobs:
             main.js
             manifest.json
             styles.css
-            obsidian-termy.zip
+            termy.zip
             binaries/termy-server-win32-x64.exe
             binaries/termy-server-win32-x64.exe.sha256
             binaries/termy-server-darwin-arm64
@@ -152,33 +152,38 @@ jobs:
             binaries/termy-server-linux-arm64
             binaries/termy-server-linux-arm64.sha256
           body: |
-            ## Installation
+            ## 🚀 Installation
             
-            ### Option 1: BRAT (Recommended)
+            ### Community Plugin (Recommended - Coming Soon)
+            Once approved, install directly from Obsidian's Community Plugins browser.
+            
+            ### BRAT (Beta Testing)
             1. Install [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin
-            2. Add this repository: `ZyphrZero/Obsidian-Termy`
+            2. Add this repository: `ZyphrZero/Termy`
             3. BRAT will automatically download the correct binary for your platform
             
-            ### Option 2: Manual Installation
-            1. Download `obsidian-termy.zip` (includes all platform binaries)
+            ### Manual Installation
+            
+            **Option 1: Complete Package (All Platforms)**
+            1. Download `termy.zip` (includes all platform binaries)
             2. Extract to `.obsidian/plugins/` directory
             3. Restart Obsidian and enable the plugin
             
-            ### Option 3: Platform-Specific Installation
+            **Option 2: Platform-Specific (Smaller Download)**
             1. Download the three core files: `main.js`, `manifest.json`, `styles.css`
             2. Download the binary for your platform:
-               - Windows: `termy-server-win32-x64.exe`
-               - macOS (Apple Silicon): `termy-server-darwin-arm64`
-               - macOS (Intel): `termy-server-darwin-x64`
-               - Linux (x64): `termy-server-linux-x64`
-               - Linux (ARM64): `termy-server-linux-arm64`
-            3. Create directory: `.obsidian/plugins/obsidian-termy/binaries/`
-            4. Place core files in `obsidian-termy/` and binary in `binaries/`
+               - **Windows**: `termy-server-win32-x64.exe`
+               - **macOS (Apple Silicon)**: `termy-server-darwin-arm64`
+               - **macOS (Intel)**: `termy-server-darwin-x64`
+               - **Linux (x64)**: `termy-server-linux-x64`
+               - **Linux (ARM64)**: `termy-server-linux-arm64`
+            3. Create directory: `.obsidian/plugins/termy/binaries/`
+            4. Place core files in `termy/` and binary in `binaries/`
             5. Restart Obsidian and enable the plugin
             
-            ## Verification
+            ## 🔒 Security Verification
             
-            You can verify binary integrity using the provided `.sha256` files:
+            Verify binary integrity using the provided `.sha256` files:
             
             ```bash
             # Linux/macOS
@@ -187,5 +192,19 @@ jobs:
             # Windows (PowerShell)
             Get-FileHash termy-server-win32-x64.exe -Algorithm SHA256
             ```
+            
+            ## 📝 What's Changed
+            
+            See [CHANGELOG.md](https://github.com/ZyphrZero/Termy/blob/main/CHANGELOG.md) for details.
+            
+            ## 🐛 Known Issues
+            
+            - First launch may take a few seconds to start the PTY server
+            - On macOS, you may need to allow the binary in System Preferences → Security & Privacy
+            
+            ## 💬 Support
+            
+            - [Report Issues](https://github.com/ZyphrZero/Termy/issues)
+            - [Discussions](https://github.com/ZyphrZero/Termy/discussions)
           draft: false
           prerelease: false
