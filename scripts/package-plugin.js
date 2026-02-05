@@ -1,15 +1,19 @@
 /**
  * Plugin Package Script
  * Package plugin files for distribution
- * 
+ *
  * Usage:
  *   node scripts/package-plugin.js        # Package for current platform
  *   node scripts/package-plugin.js --zip  # Create ZIP archive
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Termy server configuration
 const SERVER_CONFIG = {
@@ -43,7 +47,8 @@ const PACKAGE_DIR = path.join(ROOT_DIR, 'plugin-package');
 console.log('🔍 Checking required files...');
 const requiredFiles = [
   'main.js',
-  'manifest.json'
+  'manifest.json',
+  'styles.css'
 ];
 
 for (const file of requiredFiles) {
@@ -96,12 +101,6 @@ for (const file of requiredFiles) {
 // 5. Copy binary file
 const destBinaryPath = path.join(PACKAGE_DIR, 'binaries', binaryName);
 fs.copyFileSync(binaryPath, destBinaryPath);
-
-// Copy SHA256 file if exists
-const checksumSrc = `${binaryPath}.sha256`;
-if (fs.existsSync(checksumSrc)) {
-  fs.copyFileSync(checksumSrc, `${destBinaryPath}.sha256`);
-}
 
 console.log(`  ✓ binaries/${binaryName}`);
 console.log('');

@@ -4,6 +4,7 @@
 
 import { setIcon } from 'obsidian';
 import type { SimpleIcon } from 'simple-icons';
+import { escapeCssString } from '../../utils/styleUtils';
 import {
   siOpenai,
   siGoogle,
@@ -940,6 +941,29 @@ export const PRESET_SCRIPT_ICON_OPTIONS = [
   ...DEFAULT_ICON_OPTIONS,
 ];
 
+let presetIconStyleReady = false;
+
+function ensurePresetIconStyles(): void {
+  if (presetIconStyleReady) return;
+  const styleEl = document.createElement('style');
+  styleEl.setAttribute('data-termy-style-scope', 'preset-script-icons');
+  styleEl.textContent = buildPresetIconStyleRules();
+  document.head.appendChild(styleEl);
+  presetIconStyleReady = true;
+}
+
+function buildPresetIconStyleRules(): string {
+  const rules: string[] = [];
+  for (const [key, icon] of Object.entries(SIMPLE_ICON_MAP)) {
+    if (!icon.hex) continue;
+    const safeKey = escapeCssString(key);
+    rules.push(
+      `.preset-script-custom-icon[data-icon="${safeKey}"]{--preset-script-icon-color:#${icon.hex};}`
+    );
+  }
+  return rules.join('');
+}
+
 export function isCustomPresetScriptIcon(iconName: string): boolean {
   const lookup = iconName.toLowerCase();
   return lookup in SIMPLE_ICON_MAP;
@@ -948,14 +972,26 @@ export function isCustomPresetScriptIcon(iconName: string): boolean {
 export function renderPresetScriptIcon(el: HTMLElement, iconName: string): void {
   const raw = (iconName || 'terminal').trim();
   const lookup = raw.toLowerCase();
-  el.innerHTML = '';
+  el.empty();
+  ensurePresetIconStyles();
   if (isCustomPresetScriptIcon(raw)) {
     const icon = SIMPLE_ICON_MAP[lookup];
-    const color = icon.hex ? `#${icon.hex}` : 'currentColor';
-    el.innerHTML = `<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" style=\"color:${color}\"><path fill=\"currentColor\" d=\"${icon.path}\"></path></svg>`;
-    el.classList.add('preset-script-custom-icon');
+    el.addClass('preset-script-custom-icon');
+    el.setAttr('data-icon', lookup);
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('fill', 'currentColor');
+    path.setAttribute('d', icon.path);
+    svg.appendChild(path);
+
+    el.appendChild(svg);
   } else {
-    el.classList.remove('preset-script-custom-icon');
+    el.removeClass('preset-script-custom-icon');
+    el.removeAttribute('data-icon');
     setIcon(el, raw);
   }
 }

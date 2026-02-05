@@ -1,8 +1,10 @@
 import type { WorkspaceLeaf, Menu } from 'obsidian';
-import { ItemView, Notice } from 'obsidian';
+import { ItemView, Notice, setIcon } from 'obsidian';
 import type { TerminalService } from '../../services/terminal/terminalService';
 import type { TerminalInstance } from '../../services/terminal/terminalInstance';
+import type { TerminalSettings } from '../../settings/settings';
 import { errorLog } from '../../utils/logger';
+import { clamp, createStyleId, normalizeBackgroundPosition, normalizeBackgroundSize, toCssUrl } from '../../utils/styleUtils';
 import { t } from '../../i18n';
 import { RenameTerminalModal } from './renameTerminalModal';
 
@@ -21,10 +23,13 @@ export class TerminalView extends ItemView {
   private initPromise: Promise<TerminalInstance> | null = null;
   private initResolve: ((terminal: TerminalInstance) => void) | null = null;
   private initReject: ((error: Error) => void) | null = null;
+  private appearanceStyleEl: HTMLStyleElement | null = null;
+  private appearanceStyleId: string | null = null;
 
   constructor(leaf: WorkspaceLeaf, terminalService: TerminalService | null) {
     super(leaf);
     this.terminalService = terminalService;
+    this.appearanceStyleId = createStyleId('termy-terminal');
     this.initPromise = new Promise<TerminalInstance>((resolve, reject) => {
       this.initResolve = resolve;
       this.initReject = reject;
@@ -41,7 +46,7 @@ export class TerminalView extends ItemView {
 
   onPaneMenu(menu: Menu): void {
     // Obsidian 可能会传入包装对象，需要获取真实的视图实例
-    const view = (this as any).realView || this;
+    const view = (this as TerminalView & { realView?: TerminalView }).realView ?? this;
     
     menu.addItem((item) => {
       item.setTitle(t('terminal.renameTerminal'))
@@ -61,7 +66,7 @@ export class TerminalView extends ItemView {
               if (view.terminalInstance && newTitle.trim()) {
                 const trimmedTitle = newTitle.trim();
                 view.terminalInstance.setTitle(trimmedTitle);
-                (view.leaf as any).updateHeader();
+                this.updateLeafHeader(view.leaf);
               }
             }
           ).open();
@@ -74,26 +79,16 @@ export class TerminalView extends ItemView {
     const container = this.contentEl;
     container.empty();
     container.addClass('terminal-view-container');
-    
-    Object.assign(container.style, {
-      padding: '0', margin: '0', height: '100%', width: '100%',
-      display: 'flex', flexDirection: 'column', overflow: 'hidden'
-    });
 
     // 创建搜索栏容器
     this.searchContainer = container.createDiv('terminal-search-container');
-    this.searchContainer.style.display = 'none';
     this.createSearchUI();
 
     this.terminalContainer = container.createDiv('terminal-container');
-    Object.assign(this.terminalContainer.style, {
-      flex: '1', minHeight: '0', overflow: 'hidden'
-    });
 
-    setTimeout(async () => {
+    setTimeout(() => {
       if (!this.terminalInstance && this.terminalContainer) {
-        await this.initializeTerminal();
-        this.setupResizeObserver();
+        void this.initializeTerminal();
       }
     }, 0);
   }
@@ -156,21 +151,9 @@ export class TerminalView extends ItemView {
     const btn = document.createElement('button');
     btn.className = 'terminal-search-btn clickable-icon';
     btn.title = title;
-    btn.innerHTML = this.getIconSvg(icon);
+    setIcon(btn, icon);
     btn.addEventListener('click', onClick);
     return btn;
-  }
-
-  /**
-   * 获取图标 SVG
-   */
-  private getIconSvg(icon: string): string {
-    const icons: Record<string, string> = {
-      'chevron-up': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"></path></svg>',
-      'chevron-down': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>',
-      'x': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>',
-    };
-    return icons[icon] || '';
   }
 
   /**
@@ -186,7 +169,7 @@ export class TerminalView extends ItemView {
    */
   showSearch(): void {
     if (this.searchContainer) {
-      this.searchContainer.style.display = 'flex';
+      this.searchContainer.addClass('is-visible');
       this.searchInput?.focus();
       this.searchInput?.select();
     }
@@ -197,7 +180,7 @@ export class TerminalView extends ItemView {
    */
   hideSearch(): void {
     if (this.searchContainer) {
-      this.searchContainer.style.display = 'none';
+      this.searchContainer.removeClass('is-visible');
     }
     this.terminalInstance?.clearSearch();
     this.terminalInstance?.focus();
@@ -217,6 +200,7 @@ export class TerminalView extends ItemView {
     }
 
     this.containerEl.empty();
+    this.disposeAppearanceStyle();
   }
 
   setTerminalService(terminalService: TerminalService): void {
@@ -235,7 +219,7 @@ export class TerminalView extends ItemView {
       this.initReject = null;
 
       this.terminalInstance.onTitleChange(() => {
-        (this.leaf as any).updateHeader();
+        this.updateLeafHeader(this.leaf);
       });
 
       // 设置搜索状态回调
@@ -249,16 +233,16 @@ export class TerminalView extends ItemView {
 
       // 设置右键菜单回调
       this.terminalInstance.setOnNewTerminal(() => {
-        this.createNewTerminal();
+        void this.createNewTerminal();
       });
 
       this.terminalInstance.setOnSplitTerminal((direction) => {
-        this.splitTerminal(direction);
+        void this.splitTerminal(direction);
       });
 
-      this.applyBackgroundImage();
-      this.applyTextOpacity();
+      this.updateAppearanceStyles();
       this.renderTerminal();
+      this.setupResizeObserver();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       errorLog('[TerminalView] Init failed:', errorMessage);
@@ -278,8 +262,8 @@ export class TerminalView extends ItemView {
   private async createNewTerminal(): Promise<void> {
     // 触发插件的 activateTerminalView 方法
     // 通过 workspace 获取插件实例
-    const plugin = (this.app as any).plugins?.plugins?.['termy'];
-    if (plugin && typeof plugin.activateTerminalView === 'function') {
+    const plugin = this.getTerminalPlugin();
+    if (plugin) {
       await plugin.activateTerminalView();
     }
   }
@@ -299,62 +283,40 @@ export class TerminalView extends ItemView {
     workspace.setActiveLeaf(newLeaf, { focus: true });
   }
 
-  private applyBackgroundImage(): void {
+  private updateAppearanceStyles(): void {
     if (!this.terminalContainer || !this.terminalInstance) return;
 
-    const options = (this.terminalInstance as any).options;
-    
-    if (options?.useObsidianTheme || !options?.backgroundImage) {
-      return;
-    }
-    if (this.terminalInstance.getCurrentRenderer() === 'webgl') {
-      return;
-    }
+    const options = this.terminalInstance.getOptions();
+    const canUseBackgroundImage = !!options?.backgroundImage
+      && !options?.useObsidianTheme
+      && this.terminalInstance.getCurrentRenderer() !== 'webgl';
 
-    const {
-      backgroundImage,
-      backgroundImageOpacity = 0.5,
-      backgroundImageSize = 'cover',
-      backgroundImagePosition = 'center',
-      enableBlur = false,
-      blurAmount = 10
-    } = options;
-
-    this.terminalContainer.addClass('has-background-image');
-    this.containerEl.querySelector('.terminal-view-container')?.addClass('has-background-image');
-
-    this.ensureBackgroundLayer();
-
-    const overlayOpacity = 1 - backgroundImageOpacity;
-    const overlayGradient = `linear-gradient(rgba(0, 0, 0, ${overlayOpacity}), rgba(0, 0, 0, ${overlayOpacity}))`;
-
-    this.terminalContainer.style.setProperty('--terminal-bg-overlay', overlayGradient);
-    this.terminalContainer.style.setProperty('--terminal-bg-image', `url("${backgroundImage}")`);
-    this.terminalContainer.style.setProperty('--terminal-bg-size', backgroundImageSize);
-    this.terminalContainer.style.setProperty('--terminal-bg-position', backgroundImagePosition);
-
-    if (enableBlur && blurAmount > 0) {
-      this.terminalContainer.style.setProperty('--terminal-bg-blur', `${blurAmount}px`);
-      this.terminalContainer.style.setProperty('--terminal-bg-scale', '1.05');
+    if (canUseBackgroundImage) {
+      this.terminalContainer.addClass('has-background-image');
+      this.containerEl.querySelector('.terminal-view-container')?.addClass('has-background-image');
+      this.ensureBackgroundLayer();
     } else {
-      this.terminalContainer.style.setProperty('--terminal-bg-blur', '0px');
-      this.terminalContainer.style.setProperty('--terminal-bg-scale', '1');
-    }
-  }
-
-  private applyTextOpacity(): void {
-    if (!this.terminalContainer || !this.terminalInstance) return;
-
-    const options = (this.terminalInstance as any).options;
-    
-    if (options?.useObsidianTheme || !options?.backgroundImage) {
-      return;
-    }
-    if (this.terminalInstance.getCurrentRenderer() === 'webgl') {
-      return;
+      this.terminalContainer.removeClass('has-background-image');
+      this.containerEl.querySelector('.terminal-view-container')?.removeClass('has-background-image');
+      this.terminalContainer.querySelector('.terminal-background-image')?.remove();
     }
 
-    this.terminalContainer.style.setProperty('--terminal-text-opacity', String(options?.textOpacity ?? 1.0));
+    const backgroundImageOpacity = options?.backgroundImageOpacity ?? 0.5;
+    const overlayOpacity = canUseBackgroundImage
+      ? clamp(1 - backgroundImageOpacity, 0, 1)
+      : 0;
+    const blurAmount = options?.blurAmount ?? 0;
+    const blurEnabled = canUseBackgroundImage && !!options?.enableBlur && blurAmount > 0;
+
+    this.applyAppearanceStyleRule({
+      backgroundImage: canUseBackgroundImage ? toCssUrl(options?.backgroundImage) : 'none',
+      overlayOpacity,
+      backgroundSize: normalizeBackgroundSize(options?.backgroundImageSize),
+      backgroundPosition: normalizeBackgroundPosition(options?.backgroundImagePosition),
+      blur: blurEnabled ? `${blurAmount}px` : '0px',
+      scale: blurEnabled ? '1.05' : '1',
+      textOpacity: canUseBackgroundImage ? String(options?.textOpacity ?? 1.0) : '1',
+    });
   }
 
   private renderTerminal(): void {
@@ -410,7 +372,7 @@ export class TerminalView extends ItemView {
   refreshAppearance(): void {
     if (!this.terminalInstance) return;
 
-    const plugin = (this.app as any).plugins?.plugins?.['termy'];
+    const plugin = this.getTerminalPlugin();
     if (!plugin) return;
 
     const settings = plugin.settings;
@@ -429,13 +391,7 @@ export class TerminalView extends ItemView {
       preferredRenderer: settings.preferredRenderer,
     });
 
-    if (this.terminalContainer) {
-      this.resetBackgroundStyles();
-    }
-    this.containerEl.querySelector('.terminal-view-container')?.removeClass('has-background-image');
-
-    this.applyBackgroundImage();
-    this.applyTextOpacity();
+    this.updateAppearanceStyles();
   }
 
   private ensureBackgroundLayer(): void {
@@ -448,17 +404,59 @@ export class TerminalView extends ItemView {
     this.terminalContainer.prepend(bgLayer);
   }
 
-  private resetBackgroundStyles(): void {
+  private applyAppearanceStyleRule(vars: {
+    backgroundImage: string;
+    overlayOpacity: number;
+    backgroundSize: string;
+    backgroundPosition: string;
+    blur: string;
+    scale: string;
+    textOpacity: string;
+  }): void {
     if (!this.terminalContainer) return;
-    this.terminalContainer.querySelector('.terminal-background-image')?.remove();
-    this.terminalContainer.removeClass('has-background-image');
-    this.terminalContainer.style.removeProperty('--terminal-text-opacity');
-    this.terminalContainer.style.removeProperty('--terminal-bg-overlay');
-    this.terminalContainer.style.removeProperty('--terminal-bg-image');
-    this.terminalContainer.style.removeProperty('--terminal-bg-size');
-    this.terminalContainer.style.removeProperty('--terminal-bg-position');
-    this.terminalContainer.style.removeProperty('--terminal-bg-blur');
-    this.terminalContainer.style.removeProperty('--terminal-bg-scale');
+
+    const styleId = this.ensureAppearanceStyleId();
+    this.terminalContainer.setAttr('data-termy-style-id', styleId);
+
+    const styleEl = this.ensureAppearanceStyleEl();
+    styleEl.textContent = [
+      `.terminal-container[data-termy-style-id="${styleId}"]{`,
+      `--terminal-bg-image:${vars.backgroundImage};`,
+      `--terminal-bg-overlay-opacity:${vars.overlayOpacity};`,
+      `--terminal-bg-size:${vars.backgroundSize};`,
+      `--terminal-bg-position:${vars.backgroundPosition};`,
+      `--terminal-bg-blur:${vars.blur};`,
+      `--terminal-bg-scale:${vars.scale};`,
+      `--terminal-text-opacity:${vars.textOpacity};`,
+      '}',
+    ].join('');
+  }
+
+  private ensureAppearanceStyleId(): string {
+    if (!this.appearanceStyleId) {
+      this.appearanceStyleId = createStyleId('termy-terminal');
+    }
+    return this.appearanceStyleId;
+  }
+
+  private ensureAppearanceStyleEl(): HTMLStyleElement {
+    if (!this.appearanceStyleEl) {
+      this.appearanceStyleEl = document.createElement('style');
+      this.appearanceStyleEl.setAttribute('data-termy-style-scope', 'terminal-view');
+      document.head.appendChild(this.appearanceStyleEl);
+    }
+    return this.appearanceStyleEl;
+  }
+
+  private disposeAppearanceStyle(): void {
+    if (this.terminalContainer) {
+      this.terminalContainer.removeAttribute('data-termy-style-id');
+    }
+    if (this.appearanceStyleEl) {
+      this.appearanceStyleEl.remove();
+      this.appearanceStyleEl = null;
+    }
+    this.appearanceStyleId = null;
   }
 
   /**
@@ -479,5 +477,25 @@ export class TerminalView extends ItemView {
     });
 
     return Promise.race([this.initPromise, timeoutPromise]);
+  }
+
+  private updateLeafHeader(leaf: WorkspaceLeaf): void {
+    const leafWithHeader = leaf as WorkspaceLeaf & { updateHeader?: () => void };
+    leafWithHeader.updateHeader?.();
+  }
+
+  private getTerminalPlugin(): { settings: TerminalSettings; activateTerminalView: () => Promise<void> } | null {
+    const appWithPlugins = this.app as typeof this.app & {
+      plugins?: { getPlugin?: (id: string) => unknown };
+    };
+    const plugin = appWithPlugins.plugins?.getPlugin?.('termy');
+    if (!this.isTerminalPlugin(plugin)) return null;
+    return plugin;
+  }
+
+  private isTerminalPlugin(value: unknown): value is { settings: TerminalSettings; activateTerminalView: () => Promise<void> } {
+    if (!value || typeof value !== 'object') return false;
+    const candidate = value as { settings?: unknown; activateTerminalView?: unknown };
+    return typeof candidate.activateTerminalView === 'function' && typeof candidate.settings === 'object';
   }
 }

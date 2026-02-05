@@ -213,7 +213,7 @@ export const en: TranslationKeys = {
       scrollback: 'Scrollback',
       scrollbackDesc: 'Number of lines to keep in scrollback buffer',
       presetScripts: 'Preset Scripts',
-      presetScriptsDesc: 'Configure scripts that can be triggered by hotkeys or status bar',
+      presetScriptsDesc: 'Configure scripts that can be triggered from the status bar',
       presetScriptsAdd: 'Add Script',
       presetScriptsAddMenu: 'Add Preset Script',
       presetScriptsEmpty: 'No scripts yet. Click "Add Script" to create one.',

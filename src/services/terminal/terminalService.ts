@@ -236,7 +236,7 @@ export class TerminalService {
     const terminal = this.terminals.get(id);
     if (terminal) {
       try {
-        await terminal.destroy();
+        terminal.destroy();
       } catch (error) {
         errorLog(`[TerminalService] 销毁终端 ${id} 失败:`, error);
       } finally {
@@ -254,24 +254,21 @@ export class TerminalService {
   /**
    * 销毁所有终端实例
    */
-  async destroyAllTerminals(): Promise<void> {
-    const destroyPromises: Promise<void>[] = [];
+  destroyAllTerminals(): void {
     const failedTerminals: string[] = [];
-    
+
     for (const [id, terminal] of this.terminals.entries()) {
-      const destroyPromise = terminal.destroy().catch(error => {
+      try {
+        terminal.destroy();
+      } catch (error) {
         errorLog(`[TerminalService] 销毁终端 ${id} 失败:`, error);
         failedTerminals.push(id);
-      });
-      destroyPromises.push(destroyPromise);
+      }
     }
-    
-    // 等待所有销毁操作完成
-    await Promise.allSettled(destroyPromises);
-    
+
     // 清空映射
     this.terminals.clear();
-    
+
     // 如果有失败的终端，记录警告
     if (failedTerminals.length > 0) {
       debugWarn(`[TerminalService] 以下终端清理失败: ${failedTerminals.join(', ')}`);
@@ -323,7 +320,7 @@ export class TerminalService {
     debugLog('[TerminalService] 开始关闭终端服务');
     
     // 销毁所有终端
-    await this.destroyAllTerminals();
+    this.destroyAllTerminals();
     
     // 确保服务器停止
     if (this.serverManager.isServerRunning()) {

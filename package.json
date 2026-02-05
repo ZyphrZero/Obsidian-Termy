@@ -1,6 +1,7 @@
 {
   "name": "termy",
-  "version": "1.2.0",
+  "version": "1.2.1",
+  "type": "module",
   "description": "Full terminal emulator with split panes, preset scripts, multiple shells, and native Rust PTY backend.",
   "main": "main.js",
   "packageManager": "pnpm@10.0.0",
@@ -12,8 +13,7 @@
     "package": "node scripts/package-plugin.js",
     "package:zip": "node scripts/package-plugin.js --zip",
     "release": "pnpm build && pnpm build:rust && pnpm package:zip",
-    "install:dev": "node scripts/install-dev.js",
-    "install:dev:force": "node scripts/install-dev.js -f --kill"
+    "install:dev": "pnpm build && pnpm build:rust && node scripts/install-dev.js"
   },
   "keywords": [
     "obsidian",

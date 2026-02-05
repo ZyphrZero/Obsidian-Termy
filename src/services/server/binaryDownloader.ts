@@ -205,7 +205,7 @@ export class BinaryDownloader {
       notify({ stage: 'checking', percent: 0 });
       
       // 获取二进制信息
-      const binaryInfo = await this.getBinaryInfo();
+      const binaryInfo = this.getBinaryInfo();
 
       // 确保目录存在
       const binariesDir = path.join(this.pluginDir, 'binaries');
@@ -314,7 +314,7 @@ export class BinaryDownloader {
    * 获取二进制文件信息
    * 直接构造 GitHub Release 下载 URL，绕过 API 限流
    */
-  private async getBinaryInfo(): Promise<BinaryInfo> {
+  private getBinaryInfo(): BinaryInfo {
     const platform = process.platform;
     const arch = process.arch;
     const ext = platform === 'win32' ? '.exe' : '';

@@ -25,7 +25,7 @@ import {
   ServerManagerError
 } from './types';
 import { PtyClient } from './ptyClient';
-import { BinaryDownloader, DownloadProgress } from './binaryDownloader';
+import { BinaryDownloader } from './binaryDownloader';
 
 /**
  * 事件监听器类型

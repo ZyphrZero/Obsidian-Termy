@@ -18,6 +18,49 @@ import { BaseSettingsRenderer } from './baseRenderer';
 import { t } from '../../i18n';
 import { PresetScriptModal } from '../../ui/terminal/presetScriptModal';
 import { PRESET_SCRIPT_ICON_OPTIONS, renderPresetScriptIcon } from '../../ui/terminal/presetScriptIcons';
+import { clamp, createStyleId, normalizeBackgroundPosition, normalizeBackgroundSize, toCssUrl } from '../../utils/styleUtils';
+
+const NEW_INSTANCE_BEHAVIORS = [
+  'replaceTab',
+  'newTab',
+  'newLeftTab',
+  'newLeftSplit',
+  'newRightTab',
+  'newRightSplit',
+  'newHorizontalSplit',
+  'newVerticalSplit',
+  'newWindow',
+] as const;
+
+const CURSOR_STYLES = ['block', 'underline', 'bar'] as const;
+
+type NewInstanceBehavior = (typeof NEW_INSTANCE_BEHAVIORS)[number];
+type CursorStyle = (typeof CURSOR_STYLES)[number];
+
+const isNewInstanceBehavior = (value: string): value is NewInstanceBehavior =>
+  NEW_INSTANCE_BEHAVIORS.includes(value as NewInstanceBehavior);
+
+const isCursorStyle = (value: string): value is CursorStyle =>
+  CURSOR_STYLES.includes(value as CursorStyle);
+
+type TerminalInstanceLike = {
+  updateOptions: (options: { scrollback?: number }) => void;
+  isAlive?: () => boolean;
+  getCurrentRenderer?: () => 'canvas' | 'webgl';
+};
+
+type TerminalViewLike = {
+  refreshAppearance?: () => void;
+  getTerminalInstance?: () => TerminalInstanceLike | null;
+};
+
+const asTerminalViewLike = (value: unknown): TerminalViewLike | null => {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as TerminalViewLike;
+  if (typeof candidate.refreshAppearance === 'function') return candidate;
+  if (typeof candidate.getTerminalInstance === 'function') return candidate;
+  return null;
+};
 
 /**
  * 验证 Shell 路径是否有效（仅桌面端可用）
@@ -30,7 +73,7 @@ function validateShellPath(path: string): boolean {
   if (Platform.isMobile) return true;
   try {
     // 动态导入 fs 模块，避免移动端加载失败
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+     
     const { existsSync } = require('fs');
     return existsSync(path);
   } catch {
@@ -44,9 +87,10 @@ function validateShellPath(path: string): boolean {
  */
 export class TerminalSettingsRenderer extends BaseSettingsRenderer {
   private themePreviewEl: HTMLElement | null = null;
-  private themePreviewBackgroundEl: HTMLElement | null = null;
   private themePreviewContentEl: HTMLElement | null = null;
   private rendererStatusEl: HTMLElement | null = null;
+  private themePreviewStyleEl: HTMLStyleElement | null = null;
+  private themePreviewStyleId: string | null = null;
 
   /**
    * 渲染终端设置
@@ -112,9 +156,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         dropdown.addOption('custom', t('shellOptions.custom'));
 
         dropdown.setValue(currentShell);
-        dropdown.onChange(async (value) => {
+        dropdown.onChange((value) => {
           setCurrentPlatformShell(this.context.plugin.settings, value as ShellType);
-          await this.saveSettings();
+          void this.saveSettings();
           
           // 使用局部更新替代全量刷新
           this.toggleConditionalSection(
@@ -143,12 +187,12 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .addText(text => text
         .setPlaceholder(t('settingsDetails.terminal.defaultArgsPlaceholder'))
         .setValue(this.context.plugin.settings.shellArgs.join(' '))
-        .onChange(async (value) => {
+        .onChange((value) => {
           // 将字符串分割为数组，过滤空字符串
           this.context.plugin.settings.shellArgs = value
             .split(' ')
             .filter(arg => arg.trim().length > 0);
-          await this.saveSettings();
+          void this.saveSettings();
         }));
 
     // 自动进入项目目录
@@ -157,9 +201,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('settingsDetails.terminal.autoEnterVaultDesc'))
       .addToggle(toggle => toggle
         .setValue(this.context.plugin.settings.autoEnterVaultDirectory)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.autoEnterVaultDirectory = value;
-          await this.saveSettings();
+          void this.saveSettings();
         }));
   }
 
@@ -177,9 +221,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         text
           .setPlaceholder(t('settingsDetails.terminal.customShellPathPlaceholder'))
           .setValue(currentCustomPath)
-          .onChange(async (value) => {
+          .onChange((value) => {
             setCurrentPlatformCustomShellPath(this.context.plugin.settings, value);
-            await this.saveSettings();
+            void this.saveSettings();
             
             // 验证路径
             this.validateCustomShellPath(container, value);
@@ -220,9 +264,10 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         dropdown.addOption('newWindow', t('layoutOptions.newWindow'));
 
         dropdown.setValue(this.context.plugin.settings.newInstanceBehavior);
-        dropdown.onChange(async (value) => {
-          this.context.plugin.settings.newInstanceBehavior = value as any;
-          await this.saveSettings();
+        dropdown.onChange((value) => {
+          if (!isNewInstanceBehavior(value)) return;
+          this.context.plugin.settings.newInstanceBehavior = value;
+          void this.saveSettings();
         });
       });
 
@@ -232,9 +277,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('settingsDetails.terminal.createNearExistingDesc'))
       .addToggle(toggle => toggle
         .setValue(this.context.plugin.settings.createInstanceNearExistingOnes)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.createInstanceNearExistingOnes = value;
-          await this.saveSettings();
+          void this.saveSettings();
         }));
 
     // 聚焦新实例
@@ -243,9 +288,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('settingsDetails.terminal.focusNewInstanceDesc'))
       .addToggle(toggle => toggle
         .setValue(this.context.plugin.settings.focusNewInstance)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.focusNewInstance = value;
-          await this.saveSettings();
+          void this.saveSettings();
         }));
 
     // 锁定新实例
@@ -254,9 +299,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('settingsDetails.terminal.lockNewInstanceDesc'))
       .addToggle(toggle => toggle
         .setValue(this.context.plugin.settings.lockNewInstance)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.lockNewInstance = value;
-          await this.saveSettings();
+          void this.saveSettings();
         }));
   }
 
@@ -279,12 +324,12 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('settingsDetails.terminal.useObsidianThemeDesc'))
       .addToggle(toggle => toggle
         .setValue(this.context.plugin.settings.useObsidianTheme)
-        .onChange(async (value) => {
-          await this.updateThemeSetting(() => {
+        .onChange((value) => {
+          void this.updateThemeSetting(() => {
             this.context.plugin.settings.useObsidianTheme = value;
+          }).then(() => {
+            this.updateCustomColorSettingsVisibility(themeCard, useObsidianThemeSetting.settingEl);
           });
-          
-          this.updateCustomColorSettingsVisibility(themeCard, useObsidianThemeSetting.settingEl);
         }));
 
     this.updateCustomColorSettingsVisibility(themeCard, useObsidianThemeSetting.settingEl);
@@ -349,10 +394,10 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       const toggle = new ToggleComponent(toggleWrap);
       toggle.setValue(showInStatusBar);
       toggle.toggleEl.setAttribute('aria-label', t('settingsDetails.terminal.presetScriptShowInStatusBar'));
-      toggle.onChange(async (value) => {
+      toggle.onChange((value) => {
         script.showInStatusBar = value;
         row.toggleClass('is-disabled', !value);
-        await this.saveSettings();
+        void this.saveSettings();
       });
 
       const iconEl = row.createDiv({ cls: 'preset-script-icon' });
@@ -374,18 +419,18 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       setIcon(moveUpBtn, 'arrow-up');
       moveUpBtn.setAttribute('aria-label', t('settingsDetails.terminal.presetScriptsMoveUp'));
       moveUpBtn.disabled = index === 0;
-      moveUpBtn.addEventListener('click', async () => {
+      moveUpBtn.addEventListener('click', () => {
         if (index === 0) return;
-        await this.movePresetScript(listEl, index, index - 1);
+        void this.movePresetScript(listEl, index, index - 1);
       });
 
       const moveDownBtn = actionsEl.createEl('button', { cls: 'clickable-icon' }) as HTMLButtonElement;
       setIcon(moveDownBtn, 'arrow-down');
       moveDownBtn.setAttribute('aria-label', t('settingsDetails.terminal.presetScriptsMoveDown'));
       moveDownBtn.disabled = index === scripts.length - 1;
-      moveDownBtn.addEventListener('click', async () => {
+      moveDownBtn.addEventListener('click', () => {
         if (index >= scripts.length - 1) return;
-        await this.movePresetScript(listEl, index, index + 1);
+        void this.movePresetScript(listEl, index, index + 1);
       });
 
       const editBtn = actionsEl.createEl('button', { cls: 'clickable-icon' });
@@ -398,21 +443,22 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       const deleteBtn = actionsEl.createEl('button', { cls: 'clickable-icon preset-script-delete' });
       setIcon(deleteBtn, 'trash');
       deleteBtn.setAttribute('aria-label', t('common.delete'));
-      deleteBtn.addEventListener('click', async () => {
+      deleteBtn.addEventListener('click', () => {
         const confirmed = window.confirm(t('settingsDetails.terminal.presetScriptsDeleteConfirm', {
           name: script.name?.trim() || t('settingsDetails.terminal.presetScriptsUnnamed')
         }));
         if (!confirmed) return;
 
         this.context.plugin.settings.presetScripts = scripts.filter(item => item.id !== script.id);
-        await this.saveSettings();
-        this.renderPresetScriptsList(listEl);
+        void this.saveSettings().then(() => {
+          this.renderPresetScriptsList(listEl);
+        });
       });
     });
   }
 
   private openPresetScriptModal(script: PresetScript, isNew: boolean, listEl: HTMLElement): void {
-    const modal = new PresetScriptModal(this.context.app, script, async (updatedScript) => {
+    const modal = new PresetScriptModal(this.context.app, script, (updatedScript) => {
       const scripts = this.context.plugin.settings.presetScripts ?? [];
       const index = scripts.findIndex(item => item.id === updatedScript.id);
 
@@ -423,8 +469,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       }
 
       this.context.plugin.settings.presetScripts = scripts;
-      await this.saveSettings();
-      this.renderPresetScriptsList(listEl);
+      void this.saveSettings().then(() => {
+        this.renderPresetScriptsList(listEl);
+      });
     }, isNew);
 
     modal.open();
@@ -473,8 +520,8 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         backgroundColorPicker = color;
         return color
           .setValue(this.context.plugin.settings.backgroundColor || '#000000')
-          .onChange(async (value) => {
-            await this.updateThemeSetting(() => {
+          .onChange((value) => {
+            void this.updateThemeSetting(() => {
               this.context.plugin.settings.backgroundColor = value;
             });
           });
@@ -482,12 +529,13 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .addExtraButton(button => button
         .setIcon('reset')
         .setTooltip(t('common.reset'))
-        .onClick(async () => {
-          await this.updateThemeSetting(() => {
+        .onClick(() => {
+          void this.updateThemeSetting(() => {
             this.context.plugin.settings.backgroundColor = undefined;
+          }).then(() => {
+            backgroundColorPicker?.setValue('#000000');
+            new Notice(t('notices.settings.backgroundColorReset'));
           });
-          backgroundColorPicker?.setValue('#000000');
-          new Notice(t('notices.settings.backgroundColorReset'));
         }));
 
     // 前景色
@@ -498,8 +546,8 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         foregroundColorPicker = color;
         return color
           .setValue(this.context.plugin.settings.foregroundColor || '#FFFFFF')
-          .onChange(async (value) => {
-            await this.updateThemeSetting(() => {
+          .onChange((value) => {
+            void this.updateThemeSetting(() => {
               this.context.plugin.settings.foregroundColor = value;
             });
           });
@@ -507,12 +555,13 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .addExtraButton(button => button
         .setIcon('reset')
         .setTooltip(t('common.reset'))
-        .onClick(async () => {
-          await this.updateThemeSetting(() => {
+        .onClick(() => {
+          void this.updateThemeSetting(() => {
             this.context.plugin.settings.foregroundColor = undefined;
+          }).then(() => {
+            foregroundColorPicker?.setValue('#FFFFFF');
+            new Notice(t('notices.settings.foregroundColorReset'));
           });
-          foregroundColorPicker?.setValue('#FFFFFF');
-          new Notice(t('notices.settings.foregroundColorReset'));
         }));
 
     // 背景图片设置（WebGL 模式将自动降级为 Canvas）
@@ -549,25 +598,25 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       const inputEl = text
         .setPlaceholder(t('settingsDetails.terminal.backgroundImagePlaceholder'))
         .setValue(this.context.plugin.settings.backgroundImage || '')
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.backgroundImage = value.trim() || undefined;
           this.updateThemePreview();
         });
       
       // 失去焦点时使用局部更新
-      text.inputEl.addEventListener('blur', async () => {
-        await this.updateThemeSetting(() => {
+      text.inputEl.addEventListener('blur', () => {
+        void this.updateThemeSetting(() => {
           this.context.plugin.settings.backgroundImage = text.inputEl.value.trim() || undefined;
+        }).then(() => {
+          const hasImage = !!this.context.plugin.settings.backgroundImage;
+          this.toggleConditionalSection(
+            container,
+            'background-image-options',
+            hasImage,
+            (el) => this.renderBackgroundImageOptionsContent(el),
+            bgImageSetting.settingEl
+          );
         });
-
-        const hasImage = !!this.context.plugin.settings.backgroundImage;
-        this.toggleConditionalSection(
-          container,
-          'background-image-options',
-          hasImage,
-          (el) => this.renderBackgroundImageOptionsContent(el),
-          bgImageSetting.settingEl
-        );
       });
       
       return inputEl;
@@ -576,22 +625,23 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
     bgImageSetting.addExtraButton(button => button
       .setIcon('reset')
       .setTooltip(t('common.reset'))
-      .onClick(async () => {
-        await this.updateThemeSetting(() => {
+      .onClick(() => {
+        void this.updateThemeSetting(() => {
           this.context.plugin.settings.backgroundImage = undefined;
+        }).then(() => {
+          backgroundImageInput?.setValue('');
+          
+          // 使用局部更新移除背景图片选项
+          this.toggleConditionalSection(
+            container,
+            'background-image-options',
+            false,
+            (el) => this.renderBackgroundImageOptionsContent(el),
+            bgImageSetting.settingEl
+          );
+          
+          new Notice(t('notices.settings.backgroundImageCleared'));
         });
-        backgroundImageInput?.setValue('');
-        
-        // 使用局部更新移除背景图片选项
-        this.toggleConditionalSection(
-          container,
-          'background-image-options',
-          false,
-          (el) => this.renderBackgroundImageOptionsContent(el),
-          bgImageSetting.settingEl
-        );
-        
-        new Notice(t('notices.settings.backgroundImageCleared'));
       }));
 
     // 背景图片相关选项（仅在有背景图片时显示）- 初始渲染
@@ -617,8 +667,8 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         .setLimits(0, 1, 0.05)
         .setValue(this.context.plugin.settings.backgroundImageOpacity ?? 0.5)
         .setDynamicTooltip()
-        .onChange(async (value) => {
-          await this.updateThemeSetting(() => {
+        .onChange((value) => {
+          void this.updateThemeSetting(() => {
             this.context.plugin.settings.backgroundImageOpacity = value;
           });
         }));
@@ -632,8 +682,8 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         .addOption('contain', t('backgroundSizeOptions.contain'))
         .addOption('auto', t('backgroundSizeOptions.auto'))
         .setValue(this.context.plugin.settings.backgroundImageSize || 'cover')
-        .onChange(async (value: 'cover' | 'contain' | 'auto') => {
-          await this.updateThemeSetting(() => {
+        .onChange((value: 'cover' | 'contain' | 'auto') => {
+          void this.updateThemeSetting(() => {
             this.context.plugin.settings.backgroundImageSize = value;
           });
         }));
@@ -653,8 +703,8 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         .addOption('bottom left', t('backgroundPositionOptions.bottomLeft'))
         .addOption('bottom right', t('backgroundPositionOptions.bottomRight'))
         .setValue(this.context.plugin.settings.backgroundImagePosition || 'center')
-        .onChange(async (value) => {
-          await this.updateThemeSetting(() => {
+        .onChange((value) => {
+          void this.updateThemeSetting(() => {
             this.context.plugin.settings.backgroundImagePosition = value;
           });
         }));
@@ -665,8 +715,8 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('settingsDetails.terminal.blurEffectDesc'))
       .addToggle(toggle => toggle
         .setValue(this.context.plugin.settings.enableBlur ?? false)
-        .onChange(async (value) => {
-          await this.updateThemeSetting(() => {
+        .onChange((value) => {
+          void this.updateThemeSetting(() => {
             this.context.plugin.settings.enableBlur = value;
           });
           
@@ -697,8 +747,8 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         .setLimits(0, 1, 0.05)
         .setValue(this.context.plugin.settings.textOpacity ?? 1.0)
         .setDynamicTooltip()
-        .onChange(async (value) => {
-          await this.updateThemeSetting(() => {
+        .onChange((value) => {
+          void this.updateThemeSetting(() => {
             this.context.plugin.settings.textOpacity = value;
           });
         }));
@@ -716,8 +766,8 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         .setLimits(0, 20, 1)
         .setValue(this.context.plugin.settings.blurAmount ?? 10)
         .setDynamicTooltip()
-        .onChange(async (value) => {
-          await this.updateThemeSetting(() => {
+        .onChange((value) => {
+          void this.updateThemeSetting(() => {
             this.context.plugin.settings.blurAmount = value;
           });
         }));
@@ -741,9 +791,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         .setLimits(8, 24, 1)
         .setValue(this.context.plugin.settings.fontSize)
         .setDynamicTooltip()
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.fontSize = value;
-          await this.saveSettings();
+          void this.saveSettings();
         }));
 
     // 字体族
@@ -753,9 +803,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .addText(text => text
         .setPlaceholder(t('settingsDetails.terminal.fontFamilyPlaceholder'))
         .setValue(this.context.plugin.settings.fontFamily)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.fontFamily = value;
-          await this.saveSettings();
+          void this.saveSettings();
         }));
 
     // 光标样式
@@ -768,9 +818,10 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         dropdown.addOption('bar', t('cursorStyleOptions.bar'));
 
         dropdown.setValue(this.context.plugin.settings.cursorStyle);
-        dropdown.onChange(async (value) => {
-          this.context.plugin.settings.cursorStyle = value as any;
-          await this.saveSettings();
+        dropdown.onChange((value) => {
+          if (!isCursorStyle(value)) return;
+          this.context.plugin.settings.cursorStyle = value;
+          void this.saveSettings();
         });
       });
 
@@ -780,9 +831,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('settingsDetails.terminal.cursorBlinkDesc'))
       .addToggle(toggle => toggle
         .setValue(this.context.plugin.settings.cursorBlink)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.cursorBlink = value;
-          await this.saveSettings();
+          void this.saveSettings();
         }));
 
     // 渲染器类型
@@ -793,12 +844,13 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
         .addOption('canvas', t('rendererOptions.canvas'))
         .addOption('webgl', t('rendererOptions.webgl'))
         .setValue(this.context.plugin.settings.preferredRenderer)
-        .onChange(async (value: 'canvas' | 'webgl') => {
-          await this.updateThemeSetting(() => {
+        .onChange((value: 'canvas' | 'webgl') => {
+          void this.updateThemeSetting(() => {
             this.context.plugin.settings.preferredRenderer = value;
+          }).then(() => {
+            this.updateBackgroundImageSettingsVisibility();
+            new Notice(t('notices.settings.rendererUpdated'));
           });
-          this.updateBackgroundImageSettingsVisibility();
-          new Notice(t('notices.settings.rendererUpdated'));
         }));
   }
 
@@ -855,20 +907,16 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
   private requestThemeRefresh(): void {
     const leaves = this.context.app.workspace.getLeavesOfType('terminal-view');
     leaves.forEach(leaf => {
-      const view = leaf.view as any;
-      if (typeof view?.refreshAppearance === 'function') {
-        view.refreshAppearance();
-      }
+      const view = asTerminalViewLike(leaf.view);
+      view?.refreshAppearance?.();
     });
   }
 
   private applyScrollbackToOpenTerminals(scrollback: number): void {
     const leaves = this.context.app.workspace.getLeavesOfType('terminal-view');
     leaves.forEach(leaf => {
-      const view = leaf.view as any;
-      if (typeof view?.getTerminalInstance === 'function') {
-        view.getTerminalInstance()?.updateOptions({ scrollback });
-      }
+      const view = asTerminalViewLike(leaf.view);
+      view?.getTerminalInstance?.()?.updateOptions({ scrollback });
     });
   }
 
@@ -888,8 +936,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
     });
 
     this.themePreviewEl = previewSection.createDiv({ cls: 'terminal-theme-preview' });
-    this.themePreviewBackgroundEl = this.themePreviewEl.createDiv({ cls: 'terminal-theme-preview-bg' });
+    this.themePreviewEl.createDiv({ cls: 'terminal-theme-preview-bg' });
     this.themePreviewContentEl = this.themePreviewEl.createDiv({ cls: 'terminal-theme-preview-content' });
+    this.themePreviewEl.setAttr('data-termy-style-id', this.ensureThemePreviewStyleId());
 
     this.themePreviewContentEl.createDiv({ text: '$ echo "Obsidian Termy"' });
     this.themePreviewContentEl.createDiv({ text: 'Obsidian Termy' });
@@ -921,11 +970,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
     let actualRenderer: 'canvas' | 'webgl' | null = null;
     const leaves = this.context.app.workspace.getLeavesOfType('terminal-view');
     for (const leaf of leaves) {
-      const view = leaf.view as any;
-      const instance = typeof view?.getTerminalInstance === 'function'
-        ? view.getTerminalInstance()
-        : null;
-      if (instance?.isAlive?.()) {
+      const view = asTerminalViewLike(leaf.view);
+      const instance = view?.getTerminalInstance?.() ?? null;
+      if (instance?.isAlive?.() && instance.getCurrentRenderer) {
         actualRenderer = instance.getCurrentRenderer();
         break;
       }
@@ -961,41 +1008,78 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
     const showBackgroundImage = !useObsidianTheme
       && !!settings.backgroundImage;
 
-    this.themePreviewEl.style.setProperty('--terminal-preview-bg', backgroundColor);
-    this.themePreviewEl.style.setProperty('--terminal-preview-fg', foregroundColor);
-
     if (showBackgroundImage) {
-      const backgroundImageOpacity = settings.backgroundImageOpacity ?? 0.5;
-      const overlayOpacity = 1 - backgroundImageOpacity;
-      const overlayGradient = `linear-gradient(rgba(0, 0, 0, ${overlayOpacity}), rgba(0, 0, 0, ${overlayOpacity}))`;
-
       this.themePreviewEl.classList.add('has-background-image');
-      this.themePreviewEl.style.setProperty('--terminal-preview-bg-overlay', overlayGradient);
-      this.themePreviewEl.style.setProperty('--terminal-preview-bg-image', `url("${settings.backgroundImage}")`);
-      this.themePreviewEl.style.setProperty('--terminal-preview-bg-size', settings.backgroundImageSize || 'cover');
-      this.themePreviewEl.style.setProperty('--terminal-preview-bg-position', settings.backgroundImagePosition || 'center');
-
-      if (settings.enableBlur && (settings.blurAmount ?? 0) > 0) {
-        this.themePreviewEl.style.setProperty('--terminal-preview-bg-blur', `${settings.blurAmount}px`);
-        this.themePreviewEl.style.setProperty('--terminal-preview-bg-scale', '1.05');
-      } else {
-        this.themePreviewEl.style.setProperty('--terminal-preview-bg-blur', '0px');
-        this.themePreviewEl.style.setProperty('--terminal-preview-bg-scale', '1');
-      }
-      this.themePreviewEl.style.setProperty(
-        '--terminal-preview-text-opacity',
-        String(settings.textOpacity ?? 1.0)
-      );
     } else {
       this.themePreviewEl.classList.remove('has-background-image');
-      this.themePreviewEl.style.setProperty('--terminal-preview-bg-overlay', 'none');
-      this.themePreviewEl.style.setProperty('--terminal-preview-bg-image', 'none');
-      this.themePreviewEl.style.setProperty('--terminal-preview-bg-size', 'cover');
-      this.themePreviewEl.style.setProperty('--terminal-preview-bg-position', 'center');
-      this.themePreviewEl.style.setProperty('--terminal-preview-bg-blur', '0px');
-      this.themePreviewEl.style.setProperty('--terminal-preview-bg-scale', '1');
-      this.themePreviewEl.style.setProperty('--terminal-preview-text-opacity', '1');
     }
+
+    const backgroundImageOpacity = settings.backgroundImageOpacity ?? 0.5;
+    const overlayOpacity = showBackgroundImage
+      ? clamp(1 - backgroundImageOpacity, 0, 1)
+      : 0;
+    const blurAmount = settings.blurAmount ?? 0;
+    const blurEnabled = showBackgroundImage && settings.enableBlur && blurAmount > 0;
+
+    this.applyThemePreviewStyleRule({
+      backgroundColor,
+      foregroundColor,
+      backgroundImage: showBackgroundImage ? toCssUrl(settings.backgroundImage) : 'none',
+      overlayOpacity,
+      backgroundSize: normalizeBackgroundSize(settings.backgroundImageSize),
+      backgroundPosition: normalizeBackgroundPosition(settings.backgroundImagePosition),
+      blur: blurEnabled ? `${blurAmount}px` : '0px',
+      scale: blurEnabled ? '1.05' : '1',
+      textOpacity: showBackgroundImage ? String(settings.textOpacity ?? 1.0) : '1',
+    });
+  }
+
+  private applyThemePreviewStyleRule(vars: {
+    backgroundColor: string;
+    foregroundColor: string;
+    backgroundImage: string;
+    overlayOpacity: number;
+    backgroundSize: string;
+    backgroundPosition: string;
+    blur: string;
+    scale: string;
+    textOpacity: string;
+  }): void {
+    if (!this.themePreviewEl) return;
+
+    const styleId = this.ensureThemePreviewStyleId();
+    this.themePreviewEl.setAttr('data-termy-style-id', styleId);
+
+    const styleEl = this.ensureThemePreviewStyleEl();
+    styleEl.textContent = [
+      `.terminal-theme-preview[data-termy-style-id="${styleId}"]{`,
+      `--terminal-preview-bg:${vars.backgroundColor};`,
+      `--terminal-preview-fg:${vars.foregroundColor};`,
+      `--terminal-preview-bg-image:${vars.backgroundImage};`,
+      `--terminal-preview-bg-overlay-opacity:${vars.overlayOpacity};`,
+      `--terminal-preview-bg-size:${vars.backgroundSize};`,
+      `--terminal-preview-bg-position:${vars.backgroundPosition};`,
+      `--terminal-preview-bg-blur:${vars.blur};`,
+      `--terminal-preview-bg-scale:${vars.scale};`,
+      `--terminal-preview-text-opacity:${vars.textOpacity};`,
+      '}',
+    ].join('');
+  }
+
+  private ensureThemePreviewStyleId(): string {
+    if (!this.themePreviewStyleId) {
+      this.themePreviewStyleId = createStyleId('termy-preview');
+    }
+    return this.themePreviewStyleId;
+  }
+
+  private ensureThemePreviewStyleEl(): HTMLStyleElement {
+    if (!this.themePreviewStyleEl) {
+      this.themePreviewStyleEl = document.createElement('style');
+      this.themePreviewStyleEl.setAttribute('data-termy-style-scope', 'terminal-preview');
+      document.head.appendChild(this.themePreviewStyleEl);
+    }
+    return this.themePreviewStyleEl;
   }
 
   /**
@@ -1016,24 +1100,24 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       const inputEl = text
         .setPlaceholder('1000')
         .setValue(String(this.context.plugin.settings.scrollback))
-        .onChange(async (value) => {
+        .onChange((value) => {
           // 只在输入时保存，不验证
           const numValue = parseInt(value);
           if (!isNaN(numValue)) {
             this.context.plugin.settings.scrollback = numValue;
-            await this.saveSettings();
+            void this.saveSettings();
             this.applyScrollbackToOpenTerminals(numValue);
           }
         });
       
       // 失去焦点时验证
-      text.inputEl.addEventListener('blur', async () => {
+      text.inputEl.addEventListener('blur', () => {
         const value = text.inputEl.value;
         const numValue = parseInt(value);
         if (isNaN(numValue) || numValue < 100 || numValue > 10000) {
           new Notice('⚠️ ' + t('notices.settings.scrollbackRangeError'));
           this.context.plugin.settings.scrollback = 1000;
-          await this.saveSettings();
+          void this.saveSettings();
           text.setValue('1000');
           this.applyScrollbackToOpenTerminals(1000);
           return;
@@ -1064,18 +1148,19 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
     }
     
     // 创建验证消息容器
-    const validationEl = containerEl.createDiv({ cls: 'shell-path-validation setting-item-description' });
-    validationEl.style.marginTop = '8px';
+    const validationEl = containerEl.createDiv({
+      cls: 'shell-path-validation setting-item-description terminal-settings-validation'
+    });
     
     // 验证路径
     const isValid = validateShellPath(path);
     
     if (isValid) {
       validationEl.setText(t('settingsDetails.terminal.pathValid'));
-      validationEl.style.color = 'var(--text-success)';
+      validationEl.addClass('is-valid');
     } else {
       validationEl.setText(t('settingsDetails.terminal.pathInvalid'));
-      validationEl.style.color = 'var(--text-error)';
+      validationEl.addClass('is-invalid');
     }
   }
 
@@ -1095,9 +1180,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('visibility.showInCommandPaletteDesc'))
       .addToggle(toggle => toggle
         .setValue(this.context.plugin.settings.visibility.showInCommandPalette)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.visibility.showInCommandPalette = value;
-          await this.saveSettings();
+          void this.saveSettings();
           this.context.plugin.updateFeatureVisibility();
         }));
 
@@ -1107,9 +1192,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('visibility.showInRibbonDesc'))
       .addToggle(toggle => toggle
         .setValue(this.context.plugin.settings.visibility.showInRibbon)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.visibility.showInRibbon = value;
-          await this.saveSettings();
+          void this.saveSettings();
           this.context.plugin.updateFeatureVisibility();
         }));
 
@@ -1119,9 +1204,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('visibility.showInNewTabDesc'))
       .addToggle(toggle => toggle
         .setValue(this.context.plugin.settings.visibility.showInNewTab)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.visibility.showInNewTab = value;
-          await this.saveSettings();
+          void this.saveSettings();
           this.context.plugin.updateFeatureVisibility();
         }));
 
@@ -1131,9 +1216,9 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('visibility.showInStatusBarDesc'))
       .addToggle(toggle => toggle
         .setValue(this.context.plugin.settings.visibility.showInStatusBar)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.visibility.showInStatusBar = value;
-          await this.saveSettings();
+          void this.saveSettings();
           this.context.plugin.updateFeatureVisibility();
         }));
 
@@ -1150,10 +1235,11 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc('在控制台输出详细的调试信息，用于排查问题')
       .addToggle(toggle => toggle
         .setValue(this.context.plugin.settings.enableDebugLog)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.context.plugin.settings.enableDebugLog = value;
-          await this.saveSettings();
-          new Notice(value ? '调试日志已启用，请打开控制台查看' : '调试日志已禁用');
+          void this.saveSettings().then(() => {
+            new Notice(value ? '调试日志已启用，请打开控制台查看' : '调试日志已禁用');
+          });
         }));
   }
 
@@ -1189,16 +1275,17 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('settingsDetails.advanced.offlineModeDesc'))
       .addToggle(toggle => toggle
         .setValue(settings.serverConnection.offlineMode)
-        .onChange(async (value) => {
+        .onChange((value) => {
           settings.serverConnection.offlineMode = value;
-          await this.saveSettings();
+          void this.saveSettings();
 
-          try {
-            const serverManager = await this.context.plugin.getServerManager();
-            serverManager.updateOfflineMode(value);
-          } catch {
-            // ServerManager 可能尚未初始化
-          }
+          void this.context.plugin.getServerManager()
+            .then((serverManager) => {
+              serverManager.updateOfflineMode(value);
+            })
+            .catch(() => {
+              // ServerManager 可能尚未初始化
+            });
         }));
 
     // 下载加速源
@@ -1208,16 +1295,17 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .addText(text => text
         .setPlaceholder('https://ghfast.top/')
         .setValue(settings.serverConnection.downloadAcceleratorUrl || '')
-        .onChange(async (value) => {
+        .onChange((value) => {
           settings.serverConnection.downloadAcceleratorUrl = value.trim();
-          await this.saveSettings();
+          void this.saveSettings();
 
-          try {
-            const serverManager = await this.context.plugin.getServerManager();
-            serverManager.updateDownloadAcceleratorUrl(settings.serverConnection.downloadAcceleratorUrl);
-          } catch {
-            // ServerManager 可能尚未初始化
-          }
+          void this.context.plugin.getServerManager()
+            .then((serverManager) => {
+              serverManager.updateDownloadAcceleratorUrl(settings.serverConnection.downloadAcceleratorUrl);
+            })
+            .catch(() => {
+              // ServerManager 可能尚未初始化
+            });
         }));
 
     // 重置按钮
@@ -1226,17 +1314,18 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       .setDesc(t('settingsDetails.advanced.resetToDefaultsDesc'))
       .addButton(button => button
         .setButtonText(t('common.reset'))
-        .onClick(async () => {
+        .onClick(() => {
           this.context.plugin.settings.serverConnection = { ...DEFAULT_SERVER_CONNECTION_SETTINGS };
-          await this.saveSettings();
+          void this.saveSettings();
 
-          try {
-            const serverManager = await this.context.plugin.getServerManager();
-            serverManager.updateOfflineMode(this.context.plugin.settings.serverConnection.offlineMode);
-            serverManager.updateDownloadAcceleratorUrl(this.context.plugin.settings.serverConnection.downloadAcceleratorUrl);
-          } catch {
-            // ServerManager 可能尚未初始化
-          }
+          void this.context.plugin.getServerManager()
+            .then((serverManager) => {
+              serverManager.updateOfflineMode(this.context.plugin.settings.serverConnection.offlineMode);
+              serverManager.updateDownloadAcceleratorUrl(this.context.plugin.settings.serverConnection.downloadAcceleratorUrl);
+            })
+            .catch(() => {
+              // ServerManager 可能尚未初始化
+            });
 
           const parentCard = containerEl.parentElement;
           if (parentCard) {

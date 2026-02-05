@@ -5,6 +5,22 @@ All notable changes to Termy will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-02-05
+
+### Fixed
+- **Renderer Status Accuracy**: Track renderer type explicitly to avoid WebGL misreporting after bundling/minification
+- **WebGL Fallback**: Automatic fallback to Canvas on WebGL context loss with reliable state update
+- **WebGL Support Check**: Validate WebGL2 support to align with xterm WebGL addon requirements
+
+### Changed
+- **Style Handling**: Replace inline style writes with scoped style rules for terminal appearance and theme preview
+- **Path Resolution**: Resolve plugin directory using `vault.configDir` instead of hard-coded `.obsidian`
+- **UI Initialization**: Defer UI setup to `workspace.onLayoutReady` for safer startup timing
+
+### Removed
+- **Legacy Styles**: Removed duplicated terminal style sheet and generated `main.css`
+- **Dead Code**: Cleaned unused fields/imports in server/client modules and modals
+
 ## [1.2.0] - 2025-02-05
 
 ### Added
@@ -69,5 +85,6 @@ If you're upgrading from version 1.1.1 or earlier:
 
 ---
 
-[1.2.0]: https://github.com/ZyphrZero/Obsidian-Termy/releases/tag/1.2.0
-[1.1.1]: https://github.com/ZyphrZero/Obsidian-Termy/releases/tag/1.1.1
+[1.2.1]: https://github.com/ZyphrZero/Termy/releases/tag/1.2.1
+[1.2.0]: https://github.com/ZyphrZero/Termy/releases/tag/1.2.0
+[1.1.1]: https://github.com/ZyphrZero/Termy/releases/tag/1.1.1

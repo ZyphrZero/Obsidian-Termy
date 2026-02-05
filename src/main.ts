@@ -1,5 +1,5 @@
-import type { WorkspaceLeaf } from 'obsidian';
-import { Notice, Plugin } from 'obsidian';
+import type { View, WorkspaceLeaf } from 'obsidian';
+import { FileSystemAdapter, Notice, Plugin, normalizePath } from 'obsidian';
 import type { PresetScript, TerminalSettings } from './settings/settings';
 import { PresetScriptModal } from './ui/terminal/presetScriptModal';
 import { PRESET_SCRIPT_ICON_OPTIONS, renderPresetScriptIcon } from './ui/terminal/presetScriptIcons';
@@ -10,10 +10,10 @@ import type { ServerManager } from './services/server/serverManager';
 import { TERMINAL_VIEW_TYPE, TerminalView } from './ui/terminal/terminalView';
 import { i18n, t } from './i18n';
 import { debugLog, errorLog } from './utils/logger';
+import { createTermyLogoSvg } from './ui/icons';
 import { FeatureVisibilityManager } from './services/visibility';
 
 // 导入终端样式
-import './ui/terminal/terminalStyles.css';
 
 /**
  * Obsidian Terminal 插件主类
@@ -116,13 +116,13 @@ export default class TerminalPlugin extends Plugin {
     // 注册所有命令
     this.registerCommands();
 
-    // 初始化状态栏
-    this.initStatusBar();
-
-    // 注册新标签页中的"打开终端"选项
-    if (this.settings.visibility.showInNewTab) {
-      this.registerNewTabTerminalAction();
-    }
+    // UI 初始化尽量延后到布局就绪
+    this.app.workspace.onLayoutReady(() => {
+      this.initStatusBar();
+      if (this.settings.visibility.showInNewTab) {
+        this.registerNewTabTerminalAction();
+      }
+    });
 
     // 添加设置标签页
     this.addSettingTab(new TerminalSettingTab(this.app, this));
@@ -133,7 +133,11 @@ export default class TerminalPlugin extends Plugin {
   /**
    * 插件卸载时调用
    */
-  async onunload() {
+  onunload(): void {
+    void this.handleUnload();
+  }
+
+  private async handleUnload(): Promise<void> {
     debugLog(t('plugin.unloadingMessage'));
 
     // 清理功能可见性管理器
@@ -228,7 +232,9 @@ export default class TerminalPlugin extends Plugin {
       ribbon: {
         icon: 'terminal-square',
         tooltip: t('ribbon.terminalTooltip'),
-        callback: () => this.activateTerminalView(),
+        callback: () => {
+          void this.activateTerminalView();
+        },
       },
       onVisibilityChange: () => {
         // 当终端可见性设置变更时，更新新标签页中的终端按钮
@@ -253,20 +259,16 @@ export default class TerminalPlugin extends Plugin {
   private initStatusBar(): void {
     this._statusBarItem = this.addStatusBarItem();
     this._statusBarItem.addClass('terminal-status-bar');
+    this._statusBarItem.addClass('is-clickable');
     this._statusBarItem.setAttr('aria-label', t('ribbon.terminalTooltip'));
-    this._statusBarItem.style.cursor = 'pointer';
-    
+
     // 创建 SVG icon + 文字
-    const iconSvg = `<svg width="18" height="18" viewBox="0 0 560 512" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 0px;">
-      <rect x="25" y="45" width="510" height="422" rx="45" fill="none" stroke="currentColor" stroke-width="32"/>
-      <path d="M95 385 V 125 A 15 15 0 0 1 110 110 H 450 A 15 15 0 0 1 465 125 V 385" fill="none" stroke="currentColor" stroke-width="24" stroke-linecap="round"/>
-      <g stroke="currentColor" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M210 190 L 270 245 L 210 300" fill="none"/>
-        <line x1="295" y1="300" x2="365" y2="300"/>
-      </g>
-    </svg>`;
-    
-    this._statusBarItem.innerHTML = iconSvg + '<span style="vertical-align: middle;">Termy</span>';
+    const iconEl = createTermyLogoSvg(18);
+    iconEl.addClass('terminal-status-bar-icon');
+    const labelEl = document.createElement('span');
+    labelEl.addClass('terminal-status-bar-label');
+    labelEl.textContent = 'Termy';
+    this._statusBarItem.append(iconEl, labelEl);
     
     // 添加点击事件
     this._statusBarItem.addEventListener('click', (event: MouseEvent) => {
@@ -294,7 +296,7 @@ export default class TerminalPlugin extends Plugin {
     const shouldShow = this.settings.visibility.enabled && 
                        this.settings.visibility.showInStatusBar;
     
-    this._statusBarItem.style.display = shouldShow ? '' : 'none';
+    this._statusBarItem.toggleClass('is-hidden', !shouldShow);
   }
 
   /**
@@ -329,14 +331,13 @@ export default class TerminalPlugin extends Plugin {
     this.addCommand({
       id: 'open-terminal',
       name: t('commands.openTerminal'),
-      hotkeys: [{ modifiers: ['Ctrl'], key: 'o' }],
       checkCallback: (checking: boolean) => {
         // 检查可见性配置
         if (!this.featureVisibilityManager.isVisibleAt('terminal', 'showInCommandPalette')) {
           return false;
         }
         if (!checking) {
-          this.activateTerminalView();
+          void this.activateTerminalView();
         }
         return true;
       }
@@ -346,7 +347,6 @@ export default class TerminalPlugin extends Plugin {
     this.addCommand({
       id: 'terminal-clear',
       name: t('commands.terminalClear'),
-      hotkeys: [{ modifiers: ['Ctrl', 'Shift'], key: 'r' }],
       checkCallback: (checking: boolean) => {
         if (!this.featureVisibilityManager.isVisibleAt('terminal', 'showInCommandPalette')) {
           return false;
@@ -367,7 +367,6 @@ export default class TerminalPlugin extends Plugin {
     this.addCommand({
       id: 'terminal-copy',
       name: t('commands.terminalCopy'),
-      hotkeys: [{ modifiers: ['Ctrl', 'Shift'], key: 'c' }],
       checkCallback: (checking: boolean) => {
         if (!this.featureVisibilityManager.isVisibleAt('terminal', 'showInCommandPalette')) {
           return false;
@@ -377,7 +376,9 @@ export default class TerminalPlugin extends Plugin {
         if (terminal && terminal.getXterm().hasSelection()) {
           if (!checking) {
             const selection = terminal.getXterm().getSelection();
-            navigator.clipboard.writeText(selection);
+            void navigator.clipboard.writeText(selection).catch((error) => {
+              errorLog('[TerminalPlugin] Copy failed:', error);
+            });
           }
           return true;
         }
@@ -389,7 +390,6 @@ export default class TerminalPlugin extends Plugin {
     this.addCommand({
       id: 'terminal-paste',
       name: t('commands.terminalPaste'),
-      hotkeys: [{ modifiers: ['Ctrl', 'Shift'], key: 'v' }],
       checkCallback: (checking: boolean) => {
         if (!this.featureVisibilityManager.isVisibleAt('terminal', 'showInCommandPalette')) {
           return false;
@@ -398,9 +398,13 @@ export default class TerminalPlugin extends Plugin {
         const terminal = terminalView?.getTerminalInstance();
         if (terminal) {
           if (!checking) {
-            navigator.clipboard.readText().then(text => {
-              terminal.write(text);
-            });
+            void navigator.clipboard.readText()
+              .then((text) => {
+                terminal.write(text);
+              })
+              .catch((error) => {
+                errorLog('[TerminalPlugin] Paste failed:', error);
+              });
           }
           return true;
         }
@@ -412,7 +416,6 @@ export default class TerminalPlugin extends Plugin {
     this.addCommand({
       id: 'terminal-font-increase',
       name: t('commands.terminalFontIncrease'),
-      hotkeys: [{ modifiers: ['Ctrl'], key: '=' }],
       checkCallback: (checking: boolean) => {
         if (!this.featureVisibilityManager.isVisibleAt('terminal', 'showInCommandPalette')) {
           return false;
@@ -433,7 +436,6 @@ export default class TerminalPlugin extends Plugin {
     this.addCommand({
       id: 'terminal-font-decrease',
       name: t('commands.terminalFontDecrease'),
-      hotkeys: [{ modifiers: ['Ctrl'], key: '-' }],
       checkCallback: (checking: boolean) => {
         if (!this.featureVisibilityManager.isVisibleAt('terminal', 'showInCommandPalette')) {
           return false;
@@ -454,7 +456,6 @@ export default class TerminalPlugin extends Plugin {
     this.addCommand({
       id: 'terminal-font-reset',
       name: t('commands.terminalFontReset'),
-      hotkeys: [{ modifiers: ['Ctrl'], key: '0' }],
       checkCallback: (checking: boolean) => {
         if (!this.featureVisibilityManager.isVisibleAt('terminal', 'showInCommandPalette')) {
           return false;
@@ -475,7 +476,6 @@ export default class TerminalPlugin extends Plugin {
     this.addCommand({
       id: 'terminal-split-horizontal',
       name: t('commands.terminalSplitHorizontal'),
-      hotkeys: [{ modifiers: ['Ctrl', 'Shift'], key: 'h' }],
       checkCallback: (checking: boolean) => {
         if (!this.featureVisibilityManager.isVisibleAt('terminal', 'showInCommandPalette')) {
           return false;
@@ -483,7 +483,7 @@ export default class TerminalPlugin extends Plugin {
         const terminalView = this.getActiveTerminalView();
         if (terminalView) {
           if (!checking) {
-            terminalView.splitTerminal('horizontal');
+            void terminalView.splitTerminal('horizontal');
           }
           return true;
         }
@@ -495,7 +495,6 @@ export default class TerminalPlugin extends Plugin {
     this.addCommand({
       id: 'terminal-split-vertical',
       name: t('commands.terminalSplitVertical'),
-      hotkeys: [{ modifiers: ['Ctrl', 'Shift'], key: 'j' }],
       checkCallback: (checking: boolean) => {
         if (!this.featureVisibilityManager.isVisibleAt('terminal', 'showInCommandPalette')) {
           return false;
@@ -503,7 +502,7 @@ export default class TerminalPlugin extends Plugin {
         const terminalView = this.getActiveTerminalView();
         if (terminalView) {
           if (!checking) {
-            terminalView.splitTerminal('vertical');
+            void terminalView.splitTerminal('vertical');
           }
           return true;
         }
@@ -515,7 +514,6 @@ export default class TerminalPlugin extends Plugin {
     this.addCommand({
       id: 'terminal-clear-buffer',
       name: t('commands.terminalClearBuffer'),
-      hotkeys: [{ modifiers: ['Ctrl', 'Shift'], key: 'k' }],
       checkCallback: (checking: boolean) => {
         if (!this.featureVisibilityManager.isVisibleAt('terminal', 'showInCommandPalette')) {
           return false;
@@ -572,16 +570,21 @@ export default class TerminalPlugin extends Plugin {
    * 获取当前活动的终端视图
    */
   private getActiveTerminalView(): TerminalView | null {
-    const leaves = this.app.workspace.getLeavesOfType(TERMINAL_VIEW_TYPE);
     const activeLeaf = this.app.workspace.activeLeaf;
     
     // 优先返回当前活动的终端视图
-    if (activeLeaf?.view.getViewType() === TERMINAL_VIEW_TYPE) {
-      return activeLeaf.view as TerminalView;
+    if (this.isTerminalView(activeLeaf?.view)) {
+      return activeLeaf.view;
     }
     
     // 否则返回第一个终端视图
-    return leaves.length > 0 ? leaves[0].view as TerminalView : null;
+    const leaves = this.app.workspace.getLeavesOfType(TERMINAL_VIEW_TYPE);
+    const view = leaves.map((item) => item.view).find((item) => this.isTerminalView(item));
+    return view ?? null;
+  }
+
+  private isTerminalView(view: View | null | undefined): view is TerminalView {
+    return !!view && view.getViewType() === TERMINAL_VIEW_TYPE;
   }
 
   /**
@@ -635,10 +638,10 @@ export default class TerminalPlugin extends Plugin {
       // 创建"打开终端"按钮
       const terminalAction = document.createElement('div');
       terminalAction.className = 'empty-state-action terminal-plugin-terminal-action';
-      terminalAction.textContent = t('commands.openTerminal') + ' (Ctrl+O)';
-      terminalAction.addEventListener('click', async () => {
+      terminalAction.textContent = t('commands.openTerminal');
+      terminalAction.addEventListener('click', () => {
         const leaf = this.findLeafByEmptyView(emptyView);
-        await this.activateTerminalView(leaf ?? undefined);
+        void this.activateTerminalView(leaf ?? undefined);
       });
 
       // 添加到操作列表
@@ -741,12 +744,16 @@ export default class TerminalPlugin extends Plugin {
   private findLeafByEmptyView(emptyView: Element): WorkspaceLeaf | null {
     const leaves = this.app.workspace.getLeavesOfType('empty');
     for (const leaf of leaves) {
-      const view = leaf.view as any;
-      if (view?.contentEl === emptyView) {
+      const view = leaf.view;
+      if (this.hasContentEl(view) && view.contentEl === emptyView) {
         return leaf;
       }
     }
     return null;
+  }
+
+  private hasContentEl(view: unknown): view is { contentEl: Element } {
+    return typeof view === 'object' && view !== null && 'contentEl' in view;
   }
 
   private getPresetScriptCommandId(scriptId: string): string {
@@ -774,10 +781,10 @@ export default class TerminalPlugin extends Plugin {
       autoOpenTerminal: true,
       runInNewTerminal: false,
     };
-    const modal = new PresetScriptModal(this.app, newScript, async (updatedScript) => {
+    const modal = new PresetScriptModal(this.app, newScript, (updatedScript) => {
       scripts.push(updatedScript);
       this.settings.presetScripts = scripts;
-      await this.saveSettings();
+      void this.saveSettings();
     }, true);
     modal.open();
   }
@@ -798,8 +805,7 @@ export default class TerminalPlugin extends Plugin {
   private showPresetScriptsMenuAtPoint(x: number, y: number): void {
     const menu = this.buildPresetScriptsMenu();
     if (!menu) return;
-    menu.style.left = `${x}px`;
-    menu.style.top = `${y}px`;
+    menu.setCssStyles({ left: `${x}px`, top: `${y}px` });
     this.mountPresetScriptsMenu(menu);
     this.adjustPresetScriptsMenuPosition(menu);
   }
@@ -807,8 +813,7 @@ export default class TerminalPlugin extends Plugin {
   private showPresetScriptsMenuAtRect(rect: DOMRect): void {
     const menu = this.buildPresetScriptsMenu();
     if (!menu) return;
-    menu.style.left = `${rect.left}px`;
-    menu.style.top = `${rect.top}px`;
+    menu.setCssStyles({ left: `${rect.left}px`, top: `${rect.top}px` });
     this.mountPresetScriptsMenu(menu);
     const menuRect = menu.getBoundingClientRect();
     let top = rect.top - menuRect.height - 8;
@@ -820,8 +825,7 @@ export default class TerminalPlugin extends Plugin {
       left = window.innerWidth - menuRect.width - 8;
     }
     if (left < 8) left = 8;
-    menu.style.top = `${top}px`;
-    menu.style.left = `${left}px`;
+    menu.setCssStyles({ top: `${top}px`, left: `${left}px` });
   }
 
   private mountPresetScriptsMenu(menu: HTMLElement): void {
@@ -857,8 +861,7 @@ export default class TerminalPlugin extends Plugin {
     if (rect.bottom > window.innerHeight - 8) {
       top = Math.max(8, window.innerHeight - rect.height - 8);
     }
-    menu.style.left = `${left}px`;
-    menu.style.top = `${top}px`;
+    menu.setCssStyles({ left: `${left}px`, top: `${top}px` });
   }
 
   private buildPresetScriptsMenu(): HTMLElement | null {
@@ -956,7 +959,7 @@ export default class TerminalPlugin extends Plugin {
     const title = (script.terminalTitle || '').trim();
     if (title) {
       terminal.setTitle(title);
-      (terminalView.leaf as any).updateHeader();
+      this.updateLeafHeader(terminalView.leaf);
     }
     const normalizedCommand = this.normalizePresetScriptCommand(command);
     terminal.write(normalizedCommand);
@@ -968,21 +971,36 @@ export default class TerminalPlugin extends Plugin {
     return normalized.endsWith('\r') ? normalized : `${normalized}\r`;
   }
 
+  private updateLeafHeader(leaf: WorkspaceLeaf): void {
+    const leafWithHeader = leaf as WorkspaceLeaf & { updateHeader?: () => void };
+    leafWithHeader.updateHeader?.();
+  }
+
   /**
    * 获取插件目录的绝对路径
    * 
    * @returns 插件目录的绝对路径
    */
   private getPluginDir(): string {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const adapter = this.app.vault.adapter as any;
-    const vaultPath = adapter.getBasePath();
-    
-    const manifestDir = this.manifest.dir || `.obsidian/plugins/${this.manifest.id}`;
-    
-    // 使用简单的路径拼接，避免依赖 Node.js path 模块
-    const separator = vaultPath.includes('\\') ? '\\' : '/';
-    return `${vaultPath}${separator}${manifestDir.replace(/\//g, separator)}`;
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) {
+      throw new Error('FileSystemAdapter is not available');
+    }
+    const vaultPath = normalizePath(adapter.getBasePath());
+    const configDir = normalizePath(this.app.vault.configDir);
+    const manifestDir = this.manifest.dir
+      ? normalizePath(this.manifest.dir)
+      : normalizePath(`${configDir}/plugins/${this.manifest.id}`);
+
+    if (this.isAbsolutePath(manifestDir)) {
+      return manifestDir;
+    }
+
+    return normalizePath(`${vaultPath}/${manifestDir}`);
+  }
+
+  private isAbsolutePath(path: string): boolean {
+    return path.startsWith('/') || /^[A-Za-z]:\//.test(path);
   }
 }
 

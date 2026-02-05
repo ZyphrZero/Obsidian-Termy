@@ -16,7 +16,7 @@ import type { ShellEvent, ShellEventSource } from '@/services/server/types';
 import '@xterm/xterm/css/xterm.css';
 
 // electron 是外部模块，使用 require 导入
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const { shell } = require('electron');
 
 // xterm.js 模块类型声明（动态导入）
@@ -122,10 +122,10 @@ export class TerminalInstance {
   private fitAddon!: FitAddon;
   private searchAddon!: SearchAddon;
   private renderer: CanvasAddon | WebglAddon | null = null;
+  private rendererType: 'canvas' | 'webgl' | null = null;
   
   // 使用 PtyClient 替代直接的 WebSocket
   private ptyClient: PtyClient | null = null;
-  private serverManager: ServerManager | null = null;
   
   // 会话 ID (多会话支持)
   private sessionId: string | null = null;
@@ -266,25 +266,45 @@ export class TerminalInstance {
     return (r * 299 + g * 587 + b * 114) / 1000 < 128;
   }
 
+  private disposeRenderer(): void {
+    if (this.renderer) {
+      try { this.renderer.dispose(); } catch { /* ignore */ }
+      this.renderer = null;
+    }
+    this.rendererType = null;
+  }
+
   private async loadRenderer(renderer: 'canvas' | 'webgl'): Promise<void> {
+    const resolvedRenderer = this.resolveRenderer(renderer);
+    await this.loadRendererInternal(resolvedRenderer);
+  }
+
+  private async loadRendererInternal(renderer: 'canvas' | 'webgl'): Promise<void> {
     if (!this.checkRendererSupport(renderer)) {
       throw new Error(t('terminalInstance.rendererNotSupported', { renderer: renderer.toUpperCase() }));
     }
 
     const { CanvasAddon, WebglAddon } = await loadXtermModules();
 
+    this.disposeRenderer();
+
     try {
       if (renderer === 'canvas') {
-        this.renderer = new CanvasAddon();
-        this.xterm.loadAddon(this.renderer);
-      } else {
-        const webglAddon = new WebglAddon();
-        webglAddon.onContextLoss(() => {
-          errorLog('[Terminal] WebGL context lost');
-        });
-        this.xterm.loadAddon(webglAddon);
-        this.renderer = webglAddon;
+        const canvasAddon = new CanvasAddon();
+        this.xterm.loadAddon(canvasAddon);
+        this.renderer = canvasAddon;
+        this.rendererType = 'canvas';
+        return;
       }
+
+      const webglAddon = new WebglAddon();
+      webglAddon.onContextLoss(() => {
+        errorLog('[Terminal] WebGL context lost, fallback to canvas renderer');
+        void this.fallbackToCanvasRenderer();
+      });
+      this.xterm.loadAddon(webglAddon);
+      this.renderer = webglAddon;
+      this.rendererType = 'webgl';
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       errorLog(`[Terminal] ${renderer} renderer failed:`, error);
@@ -298,9 +318,18 @@ export class TerminalInstance {
       if (renderer === 'canvas') {
         return !!canvas.getContext('2d');
       }
-      return !!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+      return !!canvas.getContext('webgl2');
     } catch {
       return false;
+    }
+  }
+
+  private async fallbackToCanvasRenderer(): Promise<void> {
+    try {
+      await this.loadRendererInternal('canvas');
+      this.fit();
+    } catch (error) {
+      errorLog('[Terminal] Canvas renderer fallback failed:', error);
     }
   }
 
@@ -316,8 +345,6 @@ export class TerminalInstance {
     try {
       // 动态加载 xterm.js 模块
       await this.initXterm();
-      
-      this.serverManager = serverManager;
       
       // 确保服务器运行
       await serverManager.ensureServer();
@@ -505,7 +532,7 @@ export class TerminalInstance {
     this.xterm.write('\x1b[33m正在尝试重启服务器...\x1b[0m\r\n');
   }
 
-  async destroy(): Promise<void> {
+  destroy(): void {
     if (this.isDestroyed) return;
     this.isDestroyed = true;
 
@@ -537,10 +564,10 @@ export class TerminalInstance {
       try { this.renderer.dispose(); } catch { /* ignore */ }
       this.renderer = null;
     }
+    this.rendererType = null;
 
     // 清理引用
     this.ptyClient = null;
-    this.serverManager = null;
     this.sessionId = null;
 
     try { this.xterm.dispose(); } catch { /* ignore */ }
@@ -568,17 +595,17 @@ export class TerminalInstance {
     this.setupKeyboardShortcuts(container);
 
     const preferredRenderer = this.options.preferredRenderer || 'canvas';
-    const effectiveRenderer = this.resolveRenderer(preferredRenderer);
-    
+
     // 异步加载渲染器
-    requestAnimationFrame(async () => {
-      try {
-        await this.loadRenderer(effectiveRenderer);
-        this.fit();
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        this.xterm.write(`\r\n\x1b[1;31m[渲染器错误] ${errorMsg}\x1b[0m\r\n`);
-      }
+    requestAnimationFrame(() => {
+      void this.loadRenderer(preferredRenderer)
+        .then(() => {
+          this.fit();
+        })
+        .catch((error) => {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          this.xterm.write(`\r\n\x1b[1;31m[渲染器错误] ${errorMsg}\x1b[0m\r\n`);
+        });
     });
   }
 
@@ -692,18 +719,7 @@ export class TerminalInstance {
 
     const menu = document.createElement('div');
     menu.className = 'terminal-context-menu';
-    menu.style.cssText = `
-      position: fixed;
-      left: ${x}px;
-      top: ${y}px;
-      z-index: 10000;
-      background: var(--background-primary);
-      border: 1px solid var(--background-modifier-border);
-      border-radius: 6px;
-      padding: 4px 0;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-      min-width: 180px;
-    `;
+    menu.setCssStyles({ left: `${x}px`, top: `${y}px` });
 
     const hasSelection = this.xterm.hasSelection();
     const selectedText = hasSelection ? this.xterm.getSelection() : '';
@@ -713,11 +729,11 @@ export class TerminalInstance {
       t('terminal.contextMenu.copy'),
       'copy',
       hasSelection,
-      async () => {
-        if (selectedText) {
-          await navigator.clipboard.writeText(selectedText);
+      () => {
+        if (!selectedText) return;
+        void this.writeToClipboard(selectedText, () => {
           this.xterm.clearSelection();
-        }
+        });
       },
       'Ctrl+Shift+C'
     ));
@@ -727,12 +743,12 @@ export class TerminalInstance {
       t('terminal.contextMenu.copyAsPlainText'),
       'file-text',
       hasSelection,
-      async () => {
-        if (selectedText) {
-          const plainText = this.stripAnsiCodes(selectedText);
-          await navigator.clipboard.writeText(plainText);
+      () => {
+        if (!selectedText) return;
+        const plainText = this.stripAnsiCodes(selectedText);
+        void this.writeToClipboard(plainText, () => {
           this.xterm.clearSelection();
-        }
+        });
       }
     ));
 
@@ -741,15 +757,8 @@ export class TerminalInstance {
       t('terminal.contextMenu.paste'),
       'clipboard-paste',
       true,
-      async () => {
-        try {
-          const text = await navigator.clipboard.readText();
-          if (text && this.ptyClient && this.sessionId) {
-            this.ptyClient.write(this.sessionId, text);
-          }
-        } catch (error) {
-          errorLog('[Terminal] Paste failed:', error);
-        }
+      () => {
+        void this.pasteFromClipboard();
       },
       'Ctrl+Shift+V'
     ));
@@ -791,9 +800,9 @@ export class TerminalInstance {
       t('terminal.contextMenu.copyPath'),
       'folder',
       true,
-      async () => {
+      () => {
         const cwd = this.getCwd();
-        await navigator.clipboard.writeText(cwd);
+        void this.writeToClipboard(cwd);
       }
     ));
 
@@ -892,10 +901,10 @@ export class TerminalInstance {
     // 调整菜单位置
     const rect = menu.getBoundingClientRect();
     if (rect.right > window.innerWidth) {
-      menu.style.left = `${window.innerWidth - rect.width - 5}px`;
+      menu.setCssStyles({ left: `${window.innerWidth - rect.width - 5}px` });
     }
     if (rect.bottom > window.innerHeight) {
-      menu.style.top = `${window.innerHeight - rect.height - 5}px`;
+      menu.setCssStyles({ top: `${window.innerHeight - rect.height - 5}px` });
     }
 
     // 点击其他地方关闭菜单
@@ -913,6 +922,26 @@ export class TerminalInstance {
     }, 0);
   }
 
+  private async writeToClipboard(text: string, onSuccess?: () => void): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text);
+      onSuccess?.();
+    } catch (error) {
+      errorLog('[Terminal] Clipboard write failed:', error);
+    }
+  }
+
+  private async pasteFromClipboard(): Promise<void> {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && this.ptyClient && this.sessionId) {
+        this.ptyClient.write(this.sessionId, text);
+      }
+    } catch (error) {
+      errorLog('[Terminal] Paste failed:', error);
+    }
+  }
+
   /**
    * 创建菜单项
    */
@@ -925,55 +954,31 @@ export class TerminalInstance {
   ): HTMLElement {
     const item = document.createElement('div');
     item.className = 'terminal-context-menu-item';
-    item.style.cssText = `
-      display: flex;
-      align-items: center;
-      padding: 6px 12px;
-      cursor: ${enabled ? 'pointer' : 'default'};
-      color: ${enabled ? 'var(--text-normal)' : 'var(--text-muted)'};
-      font-size: 13px;
-      gap: 8px;
-    `;
+    if (!enabled) item.addClass('is-disabled');
 
     // 图标
     const iconEl = document.createElement('span');
-    iconEl.innerHTML = this.getIconSvg(icon);
-    iconEl.style.cssText = `
-      width: 16px;
-      height: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: ${enabled ? '1' : '0.5'};
-    `;
+    iconEl.className = 'terminal-context-menu-icon';
+    if (!enabled) iconEl.addClass('is-disabled');
+    const iconSvg = this.createIconElement(icon);
+    if (iconSvg) iconEl.appendChild(iconSvg);
     item.appendChild(iconEl);
 
     // 文本
     const textEl = document.createElement('span');
     textEl.textContent = label;
-    textEl.style.flex = '1';
+    textEl.className = 'terminal-context-menu-text';
     item.appendChild(textEl);
 
     // 快捷键
     if (shortcut) {
       const shortcutEl = document.createElement('span');
       shortcutEl.textContent = shortcut;
-      shortcutEl.style.cssText = `
-        color: var(--text-faint);
-        font-size: 12px;
-        opacity: 0.7;
-        margin-left: 12px;
-      `;
+      shortcutEl.className = 'terminal-context-menu-shortcut';
       item.appendChild(shortcutEl);
     }
 
     if (enabled) {
-      item.addEventListener('mouseenter', () => {
-        item.style.background = 'var(--background-modifier-hover)';
-      });
-      item.addEventListener('mouseleave', () => {
-        item.style.background = 'transparent';
-      });
       item.addEventListener('click', (e) => {
         e.stopPropagation();
         onClick();
@@ -994,36 +999,28 @@ export class TerminalInstance {
   ): HTMLElement {
     const container = document.createElement('div');
     container.className = 'terminal-context-submenu-container';
-    container.style.cssText = 'position: relative;';
 
     const item = document.createElement('div');
     item.className = 'terminal-context-menu-item';
-    item.style.cssText = `
-      display: flex;
-      align-items: center;
-      padding: 6px 12px;
-      cursor: pointer;
-      color: var(--text-normal);
-      font-size: 13px;
-      gap: 8px;
-    `;
 
     // 图标
     const iconEl = document.createElement('span');
-    iconEl.innerHTML = this.getIconSvg(icon);
-    iconEl.style.cssText = 'width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;';
+    iconEl.className = 'terminal-context-menu-icon';
+    const iconSvg = this.createIconElement(icon);
+    if (iconSvg) iconEl.appendChild(iconSvg);
     item.appendChild(iconEl);
 
     // 文本
     const textEl = document.createElement('span');
     textEl.textContent = label;
-    textEl.style.flex = '1';
+    textEl.className = 'terminal-context-menu-text';
     item.appendChild(textEl);
 
     // 箭头
     const arrowEl = document.createElement('span');
-    arrowEl.innerHTML = this.getIconSvg('chevron-right');
-    arrowEl.style.cssText = 'width: 12px; height: 12px; display: flex; align-items: center;';
+    arrowEl.className = 'terminal-context-submenu-arrow';
+    const arrowSvg = this.createIconElement('chevron-right');
+    if (arrowSvg) arrowEl.appendChild(arrowSvg);
     item.appendChild(arrowEl);
 
     container.appendChild(item);
@@ -1031,20 +1028,6 @@ export class TerminalInstance {
     // 子菜单
     const submenu = document.createElement('div');
     submenu.className = 'terminal-context-submenu';
-    submenu.style.cssText = `
-      position: absolute;
-      left: 100%;
-      top: 0;
-      background: var(--background-primary);
-      border: 1px solid var(--background-modifier-border);
-      border-radius: 6px;
-      padding: 4px 0;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-      min-width: 200px;
-      display: none;
-      z-index: 10001;
-      white-space: nowrap;
-    `;
 
     items.forEach(subItem => {
       submenu.appendChild(this.createMenuItem(subItem.label, subItem.icon, true, subItem.onClick, subItem.shortcut));
@@ -1054,20 +1037,18 @@ export class TerminalInstance {
 
     // 悬停显示子菜单
     item.addEventListener('mouseenter', () => {
-      item.style.background = 'var(--background-modifier-hover)';
-      submenu.style.display = 'block';
-      
+      submenu.addClass('is-visible');
+      submenu.removeClass('is-flipped');
+
       // 调整子菜单位置
       const rect = submenu.getBoundingClientRect();
       if (rect.right > window.innerWidth) {
-        submenu.style.left = 'auto';
-        submenu.style.right = '100%';
+        submenu.addClass('is-flipped');
       }
     });
 
     container.addEventListener('mouseleave', () => {
-      item.style.background = 'transparent';
-      submenu.style.display = 'none';
+      submenu.removeClass('is-visible');
     });
 
     return container;
@@ -1078,11 +1059,7 @@ export class TerminalInstance {
    */
   private createSeparator(): HTMLElement {
     const separator = document.createElement('div');
-    separator.style.cssText = `
-      height: 1px;
-      background: var(--background-modifier-border);
-      margin: 4px 8px;
-    `;
+    separator.className = 'terminal-context-separator';
     return separator;
   }
 
@@ -1090,7 +1067,7 @@ export class TerminalInstance {
    * 去除 ANSI 转义序列
    */
   private stripAnsiCodes(text: string): string {
-    // eslint-disable-next-line no-control-regex
+    // eslint-disable-next-line no-control-regex -- 需要匹配 ANSI 控制序列
     return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
   }
 
@@ -1122,6 +1099,14 @@ export class TerminalInstance {
       'x': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>',
     };
     return icons[icon] || '';
+  }
+
+  private createIconElement(icon: string): SVGElement | null {
+    const svgText = this.getIconSvg(icon);
+    if (!svgText) return null;
+    const parsed = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+    const svg = parsed.querySelector('svg');
+    return svg ? (document.importNode(svg, true) as SVGElement) : null;
   }
 
   // ==================== 搜索功能 ====================
@@ -1346,7 +1331,7 @@ export class TerminalInstance {
 
   detach(): void {
     if (this.containerEl) {
-      this.containerEl.innerHTML = '';
+      this.containerEl.empty();
       this.containerEl = null;
     }
   }
@@ -1361,6 +1346,10 @@ export class TerminalInstance {
 
   getTitle(): string { return this.title; }
 
+  getOptions(): Readonly<TerminalOptions> {
+    return this.options;
+  }
+
   setTitle(title: string): void {
     this.title = title;
     this.titleChangeCallback?.(title);
@@ -1373,7 +1362,7 @@ export class TerminalInstance {
    */
   private extractCwdFromOutput(data: string): void {
     // OSC 7 格式 (标准): \x1b]7;file://hostname/path\x07 或 \x1b]7;file://hostname/path\x1b\\
-    // eslint-disable-next-line no-control-regex
+    // eslint-disable-next-line no-control-regex -- 需要匹配 ANSI 控制序列
     const osc7Match = data.match(/\x1b\]7;file:\/\/[^/]*([^\x07\x1b]+)[\x07\x1b]/);
     if (osc7Match) {
       try {
@@ -1387,7 +1376,7 @@ export class TerminalInstance {
     }
     
     // OSC 9;9 格式 (Windows Terminal/PowerShell): \x1b]9;9;path\x07
-    // eslint-disable-next-line no-control-regex
+    // eslint-disable-next-line no-control-regex -- 需要匹配 ANSI 控制序列
     const osc9Match = data.match(/\x1b\]9;9;([^\x07\x1b]+)[\x07\x1b]/);
     if (osc9Match) {
       this.currentCwd = osc9Match[1];
@@ -1396,7 +1385,7 @@ export class TerminalInstance {
     }
     
     // OSC 0 格式 (窗口标题，Git Bash 使用): \x1b]0;MINGW64:/path\x07
-    // eslint-disable-next-line no-control-regex
+    // eslint-disable-next-line no-control-regex -- 需要匹配 ANSI 控制序列
     const osc0Match = data.match(/\x1b\]0;(?:MINGW(?:64|32)|MSYS):([^\x07]+)\x07/);
     if (osc0Match) {
       let path = osc0Match[1];
@@ -1411,7 +1400,7 @@ export class TerminalInstance {
     }
     
     // Prompt 解析 (fallback for Windows shells)
-    // eslint-disable-next-line no-control-regex
+    // eslint-disable-next-line no-control-regex -- 需要匹配 ANSI 控制序列
     const cleanData = data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
     
     // PowerShell prompt: PS path>
@@ -1476,9 +1465,7 @@ export class TerminalInstance {
   getSearchAddon(): SearchAddon { return this.searchAddon; }
 
   getCurrentRenderer(): 'canvas' | 'webgl' {
-    // 通过检查渲染器的构造函数名称判断类型
-    if (this.renderer && this.renderer.constructor.name === 'WebglAddon') return 'webgl';
-    return 'canvas';
+    return this.rendererType ?? 'canvas';
   }
 
   /**

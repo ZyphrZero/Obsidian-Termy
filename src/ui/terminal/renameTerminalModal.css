@@ -13,7 +13,7 @@
   margin-bottom: 16px;
 }
 
-.rename-terminal-modal .modal-title h2 {
+.rename-terminal-modal .modal-title .modal-title-text {
   margin: 0;
   font-size: 18px;
   font-weight: 600;

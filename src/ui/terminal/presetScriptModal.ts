@@ -14,7 +14,6 @@ export class PresetScriptModal extends Modal {
   private isNew: boolean;
   private nameInput: HTMLInputElement | null = null;
   private iconInput: HTMLInputElement | null = null;
-  private commandInput: HTMLTextAreaElement | null = null;
   private iconPreview: HTMLElement | null = null;
   private iconPickerButtons: Map<string, HTMLButtonElement> = new Map();
   private iconPickerPanel: HTMLElement | null = null;
@@ -42,7 +41,10 @@ export class PresetScriptModal extends Modal {
     contentEl.empty();
 
     const titleEl = contentEl.createDiv({ cls: 'modal-title' });
-    titleEl.createEl('h2', { text: this.isNew ? t('modals.presetScript.titleCreate') : t('modals.presetScript.titleEdit') });
+    titleEl.createDiv({
+      cls: 'modal-title-text',
+      text: this.isNew ? t('modals.presetScript.titleCreate') : t('modals.presetScript.titleEdit')
+    });
 
     const formEl = contentEl.createDiv({ cls: 'preset-script-form' });
 
@@ -114,7 +116,6 @@ export class PresetScriptModal extends Modal {
     document.addEventListener('click', this.outsideClickHandler);
 
     this.renderTextAreaField(formEl, t('settingsDetails.terminal.presetScriptCommand'), t('settingsDetails.terminal.presetScriptCommandPlaceholder'), (input) => {
-      this.commandInput = input;
       input.value = this.draft.command ?? '';
       input.addEventListener('input', () => {
         this.draft.command = input.value;
@@ -292,7 +293,6 @@ export class PresetScriptModal extends Modal {
     contentEl.empty();
     this.nameInput = null;
     this.iconInput = null;
-    this.commandInput = null;
     this.iconPreview = null;
     this.iconPickerButtons.clear();
     this.iconPickerPanel = null;

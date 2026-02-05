@@ -76,6 +76,16 @@
   flex: 1;
 }
 
+.terminal-settings-validation {
+  margin-top: 8px;
+}
+.terminal-settings-validation.is-valid {
+  color: var(--text-success);
+}
+.terminal-settings-validation.is-invalid {
+  color: var(--text-error);
+}
+
 /* ==================== Rename Terminal Modal Styles ==================== */
 /* 模态框容器 */
 .rename-terminal-modal .modal {
@@ -88,7 +98,7 @@
   margin-bottom: 16px;
 }
 
-.rename-terminal-modal .modal-title h2 {
+.modal-title-text {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
@@ -374,6 +384,10 @@
   height: 20px;
 }
 
+.preset-script-custom-icon svg {
+  color: var(--preset-script-icon-color, currentColor);
+}
+
 .preset-script-icon-preview.preset-script-custom-icon svg {
   width: 20px;
   height: 20px;
@@ -566,6 +580,14 @@
   transition: opacity 0.2s ease;
 }
 
+.terminal-status-bar.is-clickable {
+  cursor: pointer;
+}
+
+.terminal-status-bar.is-hidden {
+  display: none;
+}
+
 .terminal-status-bar:hover {
   opacity: 0.8;
 }
@@ -678,6 +700,26 @@
   margin: 0 !important;
   background-color: var(--background-primary);
 }
+/* 终端搜索栏 */
+.terminal-search-container {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+}
+.terminal-search-container.is-visible {
+  display: flex;
+}
+.terminal-search-input {
+  flex: 1;
+  min-width: 0;
+}
+.terminal-search-btn {
+  width: 24px;
+  height: 24px;
+}
 /* 终端视图主容器 - 有背景图片时 */
 .terminal-view-container.has-background-image {
   background-color: transparent !important;
@@ -707,7 +749,12 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: var(--terminal-bg-overlay, none), var(--terminal-bg-image, none);
+  background-image:
+    linear-gradient(
+      rgba(0, 0, 0, var(--terminal-bg-overlay-opacity, 0)),
+      rgba(0, 0, 0, var(--terminal-bg-overlay-opacity, 0))
+    ),
+    var(--terminal-bg-image, none);
   background-size: var(--terminal-bg-size, cover);
   background-position: var(--terminal-bg-position, center);
   background-repeat: no-repeat;
@@ -1046,7 +1093,12 @@
 .terminal-theme-preview-bg {
   position: absolute;
   inset: 0;
-  background-image: var(--terminal-preview-bg-overlay, none), var(--terminal-preview-bg-image, none);
+  background-image:
+    linear-gradient(
+      rgba(0, 0, 0, var(--terminal-preview-bg-overlay-opacity, 0)),
+      rgba(0, 0, 0, var(--terminal-preview-bg-overlay-opacity, 0))
+    ),
+    var(--terminal-preview-bg-image, none);
   background-size: var(--terminal-preview-bg-size, cover);
   background-position: var(--terminal-preview-bg-position, center);
   background-repeat: no-repeat;
@@ -1069,4 +1121,87 @@
 .terminal-renderer-status-value {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* ==================== Terminal Context Menu ==================== */
+.terminal-context-menu {
+  position: fixed;
+  z-index: 10000;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 4px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 180px;
+}
+.terminal-context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  font-size: 13px;
+  gap: 8px;
+  color: var(--text-normal);
+}
+.terminal-context-menu-item:not(.is-disabled) {
+  cursor: pointer;
+}
+.terminal-context-menu-item:not(.is-disabled):hover {
+  background: var(--background-modifier-hover);
+}
+.terminal-context-menu-item.is-disabled {
+  color: var(--text-muted);
+}
+.terminal-context-menu-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.terminal-context-menu-icon.is-disabled {
+  opacity: 0.5;
+}
+.terminal-context-menu-text {
+  flex: 1;
+}
+.terminal-context-menu-shortcut {
+  color: var(--text-faint);
+  font-size: 12px;
+  opacity: 0.7;
+  margin-left: 12px;
+}
+.terminal-context-submenu-container {
+  position: relative;
+}
+.terminal-context-submenu {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 4px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  display: none;
+  z-index: 10001;
+  white-space: nowrap;
+}
+.terminal-context-submenu.is-visible {
+  display: block;
+}
+.terminal-context-submenu.is-flipped {
+  left: auto;
+  right: 100%;
+}
+.terminal-context-submenu-arrow {
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+}
+.terminal-context-separator {
+  height: 1px;
+  background: var(--background-modifier-border);
+  margin: 4px 8px;
 }

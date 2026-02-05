@@ -28,13 +28,13 @@ export class RenameTerminalModal extends Modal {
 
     // 标题
     const titleEl = contentEl.createDiv({ cls: 'modal-title' });
-    titleEl.createEl('h2', { text: t('modals.renameTerminal.title') });
+    titleEl.createDiv({ cls: 'modal-title-text', text: t('modals.renameTerminal.title') });
 
     // 输入区域容器
     const inputContainer = contentEl.createDiv({ cls: 'rename-input-container' });
     
     // 标签
-    const label = inputContainer.createEl('label', { 
+    inputContainer.createEl('label', { 
       cls: 'rename-input-label',
       text: t('modals.renameTerminal.placeholder')
     });

@@ -180,28 +180,11 @@ jobs:
             3. Create directory: `.obsidian/plugins/termy/binaries/`
             4. Place core files in `termy/` and binary in `binaries/`
             5. Restart Obsidian and enable the plugin
-            
-            ## 🔒 Security Verification
-            
-            Verify binary integrity using the provided `.sha256` files:
-            
-            ```bash
-            # Linux/macOS
-            sha256sum -c termy-server-{platform}-{arch}.sha256
-            
-            # Windows (PowerShell)
-            Get-FileHash termy-server-win32-x64.exe -Algorithm SHA256
-            ```
-            
+
             ## 📝 What's Changed
             
             See [CHANGELOG.md](https://github.com/ZyphrZero/Termy/blob/master/CHANGELOG.md) for details.
-            
-            ## 🐛 Known Issues
-            
-            - First launch may take a few seconds to start the PTY server
-            - On macOS, you may need to allow the binary in System Preferences → Security & Privacy
-            
+
             ## 💬 Support
             
             - [Report Issues](https://github.com/ZyphrZero/Termy/issues)

@@ -9,6 +9,7 @@ import type TerminalPlugin from '../main';
 import { TerminalSettingsRenderer } from './renderers/terminalSettingsRenderer';
 import type { RendererContext } from './types';
 import { t } from '../i18n';
+import { createTermyLogoSvg } from '../ui/icons';
 
 /**
  * 终端设置标签页类
@@ -63,17 +64,9 @@ export class TerminalSettingTab extends PluginSettingTab {
     
     // 添加 Termy Logo
     const iconContainer = titleGroup.createDiv({ cls: 'settings-title-icon' });
-    iconContainer.innerHTML = `<svg width="32" height="32" viewBox="0 0 560 512" xmlns="http://www.w3.org/2000/svg">
-      <rect x="25" y="45" width="510" height="422" rx="45" fill="none" stroke="currentColor" stroke-width="32"/>
-      <path d="M95 385 V 125 A 15 15 0 0 1 110 110 H 450 A 15 15 0 0 1 465 125 V 385" fill="none" stroke="currentColor" stroke-width="24" stroke-linecap="round"/>
-      <g stroke="currentColor" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M210 190 L 270 245 L 210 300" fill="none"/>
-        <line x1="295" y1="300" x2="365" y2="300"/>
-      </g>
-    </svg>`;
+    iconContainer.appendChild(createTermyLogoSvg(32));
 
-    const titleEl = titleGroup.createEl('h2', { text: t('settings.header.title') });
-    titleEl.addClass('settings-title');
+    titleGroup.createDiv({ cls: 'settings-title', text: t('settings.header.title') });
 
     // 右侧：反馈链接 + 重载按钮
     const actionsGroup = titleRow.createDiv({ cls: 'settings-actions-group' });
@@ -88,14 +81,18 @@ export class TerminalSettingTab extends PluginSettingTab {
     const reloadBtn = actionsGroup.createEl('button', { cls: 'clickable-icon' });
     setIcon(reloadBtn, 'refresh-cw');
     reloadBtn.setAttribute('aria-label', t('settings.header.reload'));
-    reloadBtn.addEventListener('click', async () => {
-      const pluginId = this.plugin.manifest.id;
-      // @ts-expect-error - 访问 Obsidian 内部 API
-      await this.app.plugins.disablePlugin(pluginId);
-      // @ts-expect-error - 访问 Obsidian 内部 API
-      await this.app.plugins.enablePlugin(pluginId);
-      // @ts-expect-error - 访问 Obsidian 内部 API
-      this.app.setting.openTabById(pluginId);
+    reloadBtn.addEventListener('click', () => {
+      void this.reloadPlugin();
     });
+  }
+
+  private async reloadPlugin(): Promise<void> {
+    const pluginId = this.plugin.manifest.id;
+    // @ts-expect-error -- 访问 Obsidian 内部 API
+    await this.app.plugins.disablePlugin(pluginId);
+    // @ts-expect-error -- 访问 Obsidian 内部 API
+    await this.app.plugins.enablePlugin(pluginId);
+    // @ts-expect-error -- 访问 Obsidian 内部 API
+    this.app.setting.openTabById(pluginId);
   }
 }

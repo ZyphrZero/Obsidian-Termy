@@ -16,6 +16,9 @@ import type {
 } from './types';
 import { debugLog, errorLog } from '@/utils/logger';
 
+type SessionEventHandler<K extends keyof SessionEventListeners> =
+  SessionEventListeners[K] extends Set<infer Handler> ? Handler : never;
+
 /**
  * PTY 模块客户端
  */
@@ -207,8 +210,7 @@ export class PtyClient extends ModuleClient {
   private onSession<K extends keyof SessionEventListeners>(
     sessionId: string,
     event: K,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    handler: any
+    handler: SessionEventHandler<K>
   ): () => void {
     if (!this.sessionListeners.has(sessionId)) {
       this.sessionListeners.set(sessionId, {
@@ -220,12 +222,15 @@ export class PtyClient extends ModuleClient {
     }
     
     const listeners = this.sessionListeners.get(sessionId)!;
-    listeners[event].add(handler);
+    // 通过事件类型关联处理器集合，避免联合类型推断成交叉函数
+    const eventListeners = listeners[event] as Set<SessionEventHandler<K>>;
+    eventListeners.add(handler);
     
     return () => {
       const sessionListeners = this.sessionListeners.get(sessionId);
       if (sessionListeners) {
-        sessionListeners[event].delete(handler);
+        const eventListeners = sessionListeners[event] as Set<SessionEventHandler<K>>;
+        eventListeners.delete(handler);
       }
     };
   }
