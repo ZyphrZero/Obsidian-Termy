@@ -6,7 +6,7 @@
 
 </div>
 
-A full-featured terminal plugin for Obsidian with xterm.js and Rust PTY backend.
+Full terminal emulator with split panes, preset scripts, multiple shells, and native Rust PTY backend.
 
 ## Features
 

@@ -3,7 +3,7 @@
   "name": "Termy",
   "version": "1.1.1",
   "minAppVersion": "0.15.0",
-  "description": "A full-featured terminal plugin for Obsidian with xterm.js and Rust PTY backend.",
+  "description": "Full terminal emulator with split panes, preset scripts, multiple shells, and native Rust PTY backend.",
   "author": "ZyphrZero",
   "authorUrl": "https://github.com/ZyphrZero",
   "isDesktopOnly": true
