@@ -216,7 +216,9 @@ export class TerminalInstance {
         // 只在 Ctrl+点击（Windows/Linux）或 Cmd+点击（macOS）时打开链接
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
-          shell.openExternal(uri);
+          void shell.openExternal(uri).catch((error) => {
+            errorLog('[Terminal] Failed to open external link:', error);
+          });
         }
       });
       this.xterm.loadAddon(webLinksAddon);
@@ -1527,7 +1529,9 @@ export class TerminalInstance {
       exec(`open "${finalPath}"`, (error: Error | null) => {
         if (error) {
           errorLog('[Terminal] Failed to open in Finder:', error);
-          shell.openPath(finalPath);
+          void shell.openPath(finalPath).catch((openError) => {
+            errorLog('[Terminal] Failed to open path via shell:', openError);
+          });
         }
       });
     } else {
@@ -1535,7 +1539,9 @@ export class TerminalInstance {
       exec(`xdg-open "${finalPath}"`, (error: Error | null) => {
         if (error) {
           errorLog('[Terminal] Failed to open in file manager:', error);
-          shell.openPath(finalPath);
+          void shell.openPath(finalPath).catch((openError) => {
+            errorLog('[Terminal] Failed to open path via shell:', openError);
+          });
         }
       });
     }
