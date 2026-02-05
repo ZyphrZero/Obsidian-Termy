@@ -9,12 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Emoji script icons**: Allow preset script icons to be emoji, rendered consistently across the picker, list, and status bar menu
+- **Additional locales**: Add Japanese (ja), Korean (ko), and Russian (ru) translations
 
 ### Changed
 - **UI text casing**: Convert English UI strings to sentence case for settings, menus, and commands
 - **Branding**: Replace “Obsidian Termy” with “Termy” in UI strings and theme preview text
 - **Style variables**: Apply theme preview and terminal appearance via element CSS variables instead of injected style tags
 - **Dialog behavior**: Replace native confirm with an Obsidian modal for preset script deletion
+- **Debug settings i18n**: Localize debug settings labels and notices
+- **Icon placeholder hint**: Mention emoji support in preset script icon placeholder text
+- **Locale detection**: Follow Obsidian language with base-language fallback
 
 ### Fixed
 - **Deprecated API usage**: Switch active view lookup to `getActiveViewOfType` to avoid `activeLeaf` deprecation
