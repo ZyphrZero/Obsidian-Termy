@@ -22,6 +22,7 @@ Full terminal emulator with split panes, preset scripts, multiple shells, and na
 - **Advanced Features**:
   - Split panes (horizontal/vertical)
   - Multiple terminal sessions
+  - Preset scripts
   - Search functionality
   - Font customization
   - Theme support (Obsidian theme or custom)
