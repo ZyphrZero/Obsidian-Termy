@@ -5,6 +5,20 @@ All notable changes to Termy will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2026-02-26
+
+### Added
+- **Drag-to-paste hint localization**: Add a dedicated i18n key for terminal drag hint text across supported locales
+
+### Changed
+- **Drop hint messaging**: Standardize terminal drop hint copy to “Drag to paste file path” without terminal title interpolation
+- **Drop hint visuals**: Redesign `.terminal-drop-hint` mask/card presentation and transition timing for clearer drag feedback
+- **Drop payload handling**: Expand path extraction pipeline to parse file entries, URI payloads, Obsidian links, and vault-relative paths
+
+### Fixed
+- **File path resolution**: Improve dropped file absolute path resolution via Electron `webUtils` integration on desktop
+- **Drag state stability**: Refine drag enter/leave depth tracking to avoid stale overlay visibility during nested drag events
+
 ## [1.2.2] - 2026-02-05
 
 ### Added
@@ -106,6 +120,7 @@ If you're upgrading from version 1.1.1 or earlier:
 
 ---
 
+[1.2.3]: https://github.com/ZyphrZero/Termy/releases/tag/1.2.3
 [1.2.2]: https://github.com/ZyphrZero/Termy/releases/tag/1.2.2
 [1.2.1]: https://github.com/ZyphrZero/Termy/releases/tag/1.2.1
 [1.2.0]: https://github.com/ZyphrZero/Termy/releases/tag/1.2.0
