@@ -1,5 +1,5 @@
 import type { View, WorkspaceLeaf } from 'obsidian';
-import { FileSystemAdapter, Notice, Plugin, normalizePath } from 'obsidian';
+import { addIcon, FileSystemAdapter, Notice, Plugin, normalizePath } from 'obsidian';
 import type { PresetScript, TerminalSettings } from './settings/settings';
 import { PresetScriptModal } from './ui/terminal/presetScriptModal';
 import { PRESET_SCRIPT_ICON_OPTIONS, renderPresetScriptIcon } from './ui/terminal/presetScriptIcons';
@@ -10,7 +10,7 @@ import type { ServerManager } from './services/server/serverManager';
 import { TERMINAL_VIEW_TYPE, TerminalView } from './ui/terminal/terminalView';
 import { i18n, t } from './i18n';
 import { debugLog, errorLog } from './utils/logger';
-import { createTermyLogoSvg } from './ui/icons';
+import { createTermyLogoSvg, createTermyLogoSvgMarkup, TERMY_RIBBON_ICON_ID } from './ui/icons';
 import { FeatureVisibilityManager } from './services/visibility';
 
 // 导入终端样式
@@ -100,6 +100,7 @@ export default class TerminalPlugin extends Plugin {
 
     // 初始化功能可见性管理器
     this.featureVisibilityManager = new FeatureVisibilityManager(this);
+    this.registerCustomIcons();
 
     // 注册功能可见性配置
     this.registerFeatureVisibility();
@@ -230,7 +231,7 @@ export default class TerminalPlugin extends Plugin {
       id: 'terminal',
       getVisibility: () => this.settings.visibility,
       ribbon: {
-        icon: 'terminal-square',
+        icon: TERMY_RIBBON_ICON_ID,
         tooltip: t('ribbon.terminalTooltip'),
         callback: () => {
           void this.activateTerminalView();
@@ -243,6 +244,10 @@ export default class TerminalPlugin extends Plugin {
         this.updateStatusBar();
       },
     });
+  }
+
+  private registerCustomIcons(): void {
+    addIcon(TERMY_RIBBON_ICON_ID, createTermyLogoSvgMarkup());
   }
 
   /**

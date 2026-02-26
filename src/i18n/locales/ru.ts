@@ -62,7 +62,7 @@ export const ru: TranslationKeys = {
   },
 
   commands: {
-    openTerminal: 'Открыть терминал',
+    openTerminal: 'Открыть терминал Termy',
     terminalSearch: 'Терминал: поиск',
     terminalClear: 'Терминал: очистить экран',
     terminalCopy: 'Терминал: копировать',
@@ -77,7 +77,7 @@ export const ru: TranslationKeys = {
   },
 
   ribbon: {
-    terminalTooltip: 'Открыть терминал',
+    terminalTooltip: 'Открыть терминал Termy',
   },
 
   visibility: {

@@ -62,7 +62,7 @@ export const ja: TranslationKeys = {
   },
 
   commands: {
-    openTerminal: 'ターミナルを開く',
+    openTerminal: 'Termyターミナルを開く',
     terminalSearch: 'ターミナル: 検索',
     terminalClear: 'ターミナル: 画面をクリア',
     terminalCopy: 'ターミナル: コピー',
@@ -77,7 +77,7 @@ export const ja: TranslationKeys = {
   },
 
   ribbon: {
-    terminalTooltip: 'ターミナルを開く',
+    terminalTooltip: 'Termyターミナルを開く',
   },
 
   visibility: {

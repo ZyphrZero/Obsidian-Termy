@@ -62,7 +62,7 @@ export const en: TranslationKeys = {
   },
 
   commands: {
-    openTerminal: 'Open terminal',
+    openTerminal: 'Open Termy terminal',
     terminalSearch: 'Terminal: search',
     terminalClear: 'Terminal: clear screen',
     terminalCopy: 'Terminal: copy',
@@ -77,7 +77,7 @@ export const en: TranslationKeys = {
   },
 
   ribbon: {
-    terminalTooltip: 'Open terminal',
+    terminalTooltip: 'Open Termy terminal',
   },
 
   visibility: {

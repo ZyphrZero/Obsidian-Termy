@@ -1,4 +1,7 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const DEFAULT_LOGO_SIZE = 16;
+
+export const TERMY_RIBBON_ICON_ID = 'termy-logo';
 
 function createSvgElement<K extends keyof SVGElementTagNameMap>(
   tag: K,
@@ -61,4 +64,11 @@ export function createTermyLogoSvg(size: number): SVGElement {
   svg.append(rect, outline, group);
 
   return svg;
+}
+
+export function createTermyLogoSvgMarkup(): string {
+  const svg = createTermyLogoSvg(DEFAULT_LOGO_SIZE);
+  svg.removeAttribute('width');
+  svg.removeAttribute('height');
+  return svg.outerHTML;
 }

@@ -62,7 +62,7 @@ export const ko: TranslationKeys = {
   },
 
   commands: {
-    openTerminal: '터미널 열기',
+    openTerminal: 'Termy 터미널 열기',
     terminalSearch: '터미널: 검색',
     terminalClear: '터미널: 화면 지우기',
     terminalCopy: '터미널: 복사',
@@ -77,7 +77,7 @@ export const ko: TranslationKeys = {
   },
 
   ribbon: {
-    terminalTooltip: '터미널 열기',
+    terminalTooltip: 'Termy 터미널 열기',
   },
 
   visibility: {

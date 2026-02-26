@@ -62,7 +62,7 @@ export const zhCN: TranslationKeys = {
   },
 
   commands: {
-    openTerminal: '打开终端',
+    openTerminal: '打开Termy终端',
     terminalSearch: '终端：搜索',
     terminalClear: '终端：清屏',
     terminalCopy: '终端：复制',
@@ -77,7 +77,7 @@ export const zhCN: TranslationKeys = {
   },
 
   ribbon: {
-    terminalTooltip: '打开终端',
+    terminalTooltip: '打开Termy终端',
   },
 
   visibility: {
