@@ -12,6 +12,13 @@ English / [中文版](./README_ZH.md)
 
 </div>
 
+## Key Advantages (At a Glance)
+
+- **Smaller native backend binary**: Rust PTY backend keeps the runtime package lean.
+- **No extra third-party runtime dependency**: No need to install separate bridge services or external terminal runtimes.
+- **Faster startup path**: Native backend + direct plugin integration reduces startup overhead.
+- **Built for real workflows**: Split panes, multi-session, preset scripts, and drag-to-paste file paths in one plugin.
+
 ## Features
 
 - **Full Terminal Experience**: Powered by xterm.js with Canvas/WebGL rendering
@@ -42,6 +49,8 @@ English / [中文版](./README_ZH.md)
 <img src="assets/ScreenShot2.jpg" width="600" />
 
 ## Installation
+
+> **Note**: This plugin is currently under review and is not yet listed in the Obsidian Community Plugins marketplace. Please install it via BRAT or manual installation for now.
 
 ### Using BRAT
 
