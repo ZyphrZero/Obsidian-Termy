@@ -1,8 +1,8 @@
 <div align="center">
 
-<svg width="280" height="256" viewBox="0 0 560 512" xmlns="http://www.w3.org/2000/svg"><rect x="25" y="45" width="510" height="422" rx="45" fill="none" stroke="#333136" stroke-width="32"/><path d="M95 385 V 125 A 15 15 0 0 1 110 110 H 450 A 15 15 0 0 1 465 125 V 385" fill="none" stroke="#333136" stroke-width="24" stroke-linecap="round"/><g stroke="#333136" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"><path d="M210 190 L 270 245 L 210 300" fill="none"/><line x1="295" y1="300" x2="365" y2="300" /></g><text x="280" y="405" font-family="Arial, sans-serif" font-size="92" font-weight="bold" fill="#333136" text-anchor="middle">Termy</text></svg>
+# Termy
 
-# Obsidian Termy
+<img src="assets/termy.svg" width="150" />
 
 </div>
 
@@ -29,6 +29,10 @@ Full terminal emulator with split panes, preset scripts, multiple shells, and na
   - Ctrl+F: Search
   - Ctrl+=/−/0: Zoom in/out/reset
   - Ctrl+Shift+H/J: Split horizontal/vertical
+## Demo
+
+<img src="assets/ScreenShot.png" width="600" />  
+<img src="assets/ScreenShot2.jpg" width="600" />
 
 ## Installation
 
