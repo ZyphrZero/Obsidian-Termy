@@ -26,6 +26,7 @@ English / [中文版](./README_ZH.md)
   - Search functionality
   - Font customization
   - Theme support (Obsidian theme or custom)
+  - Multi-language support (English, Chinese, Japanese, Korean, Russian)
   - Background images with blur effects
 - **Keyboard Shortcuts**:
   - Ctrl+O: Open terminal
