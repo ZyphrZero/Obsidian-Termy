@@ -226,7 +226,7 @@ export const zhCN: TranslationKeys = {
       presetScriptsMoveUp: '上移',
       presetScriptsMoveDown: '下移',
       presetScriptName: '脚本名称',
-      presetScriptNamePlaceholder: '例如：Claude Code 更新并启动',
+      presetScriptNamePlaceholder: '启动 Claude Code',
       presetScriptIcon: '脚本图标',
       presetScriptIconPlaceholder: '例如：sparkles / terminal / wand-2 / 😀 (支持Emoji图标)',
       presetScriptCommand: '脚本命令',

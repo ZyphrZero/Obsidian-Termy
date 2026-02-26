@@ -8,115 +8,119 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.2.3] - 2026-02-26
 
 ### Added
-- **Drag-to-paste hint localization**: Add a dedicated i18n key for terminal drag hint text across supported locales
+- Added a localized drag hint key for terminal drag-to-paste interactions.
+- Added a custom Termy SVG ribbon icon for opening the terminal view.
 
 ### Changed
-- **Drop hint messaging**: Standardize terminal drop hint copy to “Drag to paste file path” without terminal title interpolation
-- **Drop hint visuals**: Redesign `.terminal-drop-hint` mask/card presentation and transition timing for clearer drag feedback
-- **Drop payload handling**: Expand path extraction pipeline to parse file entries, URI payloads, Obsidian links, and vault-relative paths
+- Updated terminal drag hint copy to a consistent message: "Drag to paste file path".
+- Expanded drop payload parsing to support file entries, URI payloads, Obsidian links, and vault-relative paths.
+- Updated command and ribbon labels from "Open terminal" to "Open Termy terminal".
+- Improved drag hint overlay transitions for clearer visual feedback.
 
 ### Fixed
-- **File path resolution**: Improve dropped file absolute path resolution via Electron `webUtils` integration on desktop
-- **Drag state stability**: Refine drag enter/leave depth tracking to avoid stale overlay visibility during nested drag events
+- Improved dropped file absolute path resolution on desktop via Electron `webUtils`.
+- Refined drag enter/leave depth tracking to prevent stale overlay visibility during nested drag events.
 
 ## [1.2.2] - 2026-02-05
 
 ### Added
-- **Emoji script icons**: Allow preset script icons to be emoji, rendered consistently across the picker, list, and status bar menu
-- **Additional locales**: Add Japanese (ja), Korean (ko), and Russian (ru) translations
+- Added emoji support for preset script icons, rendered consistently across the picker, list, and status bar menu.
+- Added Japanese (`ja`), Korean (`ko`), and Russian (`ru`) translations.
 
 ### Changed
-- **UI text casing**: Convert English UI strings to sentence case for settings, menus, and commands
-- **Branding**: Replace “Obsidian Termy” with “Termy” in UI strings and theme preview text
-- **Style variables**: Apply theme preview and terminal appearance via element CSS variables instead of injected style tags
-- **Dialog behavior**: Replace native confirm with an Obsidian modal for preset script deletion
-- **Debug settings i18n**: Localize debug settings labels and notices
-- **Icon placeholder hint**: Mention emoji support in preset script icon placeholder text
-- **Locale detection**: Follow Obsidian language with base-language fallback
+- Converted English UI strings to sentence case for settings, menus, and commands.
+- Replaced `Obsidian Termy` with `Termy` in UI strings and theme preview text.
+- Applied theme preview and terminal appearance via element CSS variables instead of injected style tags.
+- Replaced native confirm with an Obsidian modal for preset script deletion.
+- Localized debug settings labels and notices.
+- Updated preset script icon placeholder text to mention emoji support.
+- Updated locale detection to follow the Obsidian language with base-language fallback.
 
 ### Fixed
-- **Deprecated API usage**: Switch active view lookup to `getActiveViewOfType` to avoid `activeLeaf` deprecation
-- **Promise handling**: Mark background promises as handled/voided to satisfy lint rules
-- **Type assertions**: Remove redundant assertions in preset script actions and PTY shell events
-- **Logger output**: Use `console.debug` for debug logs to meet console restrictions
+- Switched active view lookup to `getActiveViewOfType` to avoid `activeLeaf` deprecation.
+- Marked background promises as handled/voided to satisfy lint rules.
+- Removed redundant assertions in preset script actions and PTY shell events.
+- Updated debug logging to `console.debug` to meet console restrictions.
+- Added explicit error handling when opening external links and file paths from terminal output.
 
 ## [1.2.1] - 2026-02-05
 
 ### Fixed
-- **Renderer Status Accuracy**: Track renderer type explicitly to avoid WebGL misreporting after bundling/minification
-- **WebGL Fallback**: Automatic fallback to Canvas on WebGL context loss with reliable state update
-- **WebGL Support Check**: Validate WebGL2 support to align with xterm WebGL addon requirements
+- Tracked renderer type explicitly to avoid WebGL misreporting after bundling/minification.
+- Added automatic fallback to Canvas on WebGL context loss with reliable state updates.
+- Validated WebGL2 support to align with xterm WebGL addon requirements.
 
 ### Changed
-- **Style Handling**: Replace inline style writes with scoped style rules for terminal appearance and theme preview
-- **Path Resolution**: Resolve plugin directory using `vault.configDir` instead of hard-coded `.obsidian`
-- **UI Initialization**: Defer UI setup to `workspace.onLayoutReady` for safer startup timing
+- Replaced inline style writes with scoped style rules for terminal appearance and theme preview.
+- Resolved plugin directory using `vault.configDir` instead of hard-coded `.obsidian`.
+- Deferred UI setup to `workspace.onLayoutReady` for safer startup timing.
+- Optimized preset script icon loading with explicit named imports to improve tree-shaking and runtime lookup.
 
 ### Removed
-- **Legacy Styles**: Removed duplicated terminal style sheet and generated `main.css`
-- **Dead Code**: Cleaned unused fields/imports in server/client modules and modals
+- Removed duplicated terminal stylesheet and generated `main.css`.
+- Cleaned unused fields and imports in server/client modules and modals.
 
 ## [1.2.0] - 2025-02-05
 
 ### Added
-- **PowerShell 7 Support**: Added explicit PowerShell 7 (pwsh) shell option for Windows platform
-  - New 'pwsh' option in shell dropdown in terminal settings
-  - Automatic fallback from pwsh to PowerShell 5.x when PowerShell 7 is not installed
-  - Diagnostic logging for shell detection and selection process
-  - i18n translations for PowerShell 7 option (English and Chinese)
+- Added explicit PowerShell 7 (`pwsh`) shell option for Windows platform.
+- Added a new `pwsh` option to the shell dropdown in terminal settings.
+- Added automatic fallback from `pwsh` to PowerShell 5.x when PowerShell 7 is not installed.
+- Added diagnostic logging for shell detection and selection.
+- Added i18n translations for the PowerShell 7 option in English and Chinese.
 
 ### Changed
-- **Plugin ID**: Changed from `obsidian-termy` to `termy` to comply with Obsidian community guidelines
-- **Package Name**: Updated npm package name from `obsidian-termy` to `termy`
-- **Installation Path**: Plugin now installs to `.obsidian/plugins/termy/` instead of `.obsidian/plugins/obsidian-termy/`
-- **Release Package**: Renamed from `obsidian-termy.zip` to `termy.zip`
-- **Shell Detection**: Reordered Windows PowerShell detection to prioritize PowerShell 5.x for broader compatibility
+- Changed plugin ID from `obsidian-termy` to `termy` to comply with Obsidian community guidelines.
+- Updated npm package name from `obsidian-termy` to `termy`.
+- Updated installation path to `.obsidian/plugins/termy/` instead of `.obsidian/plugins/obsidian-termy/`.
+- Renamed release package from `obsidian-termy.zip` to `termy.zip`.
+- Reordered Windows shell detection to prioritize PowerShell 5.x for broader compatibility.
 
 ### Fixed
-- Updated all internal references to use new plugin ID
-- Fixed environment variable from `TERM_PROGRAM=obsidian-termy` to `TERM_PROGRAM=termy`
-- Improved shell selection logic with clearer comments explaining compatibility considerations
+- Updated all internal references to use the new plugin ID.
+- Updated environment variable from `TERM_PROGRAM=obsidian-termy` to `TERM_PROGRAM=termy`.
+- Improved shell selection logic with clearer compatibility comments.
 
 ### Technical
-- Updated `WindowsShellType` to include 'pwsh' variant
-- Enhanced shell detection with fallback mechanisms
+- Updated `WindowsShellType` to include `pwsh`.
+- Enhanced shell detection with fallback mechanisms.
 
 ### Migration Notes
 If you're upgrading from version 1.1.1 or earlier:
-1. The plugin will automatically reinstall with the new ID
-2. Your settings will be preserved
-3. Old plugin folder can be safely deleted: `.obsidian/plugins/obsidian-termy/`
+1. The plugin will automatically reinstall with the new ID.
+2. Your settings will be preserved.
+3. The old plugin folder can be safely deleted: `.obsidian/plugins/obsidian-termy/`.
 
 ## [1.1.1] - 2025-02-05
 
 ### Added
-- Full-featured terminal emulation with xterm.js
-- Cross-platform support (Windows, macOS, Linux)
-- Multiple shell support (cmd, PowerShell, WSL, Git Bash, bash, zsh)
-- Split panes (horizontal/vertical)
-- Terminal search functionality (Ctrl+F)
-- Font customization
-- Theme support (Obsidian theme or custom)
-- Background images with blur effects
-- Internationalization support (English, Chinese)
+- Added full-featured terminal emulation with xterm.js.
+- Added cross-platform support (Windows, macOS, Linux).
+- Added support for multiple shells (cmd, PowerShell, WSL, Git Bash, bash, zsh).
+- Added split panes (horizontal/vertical).
+- Added terminal search functionality (`Ctrl+F`).
+- Added font customization.
+- Added theme support (Obsidian theme or custom).
+- Added background images with blur effects.
+- Added internationalization support (English, Chinese).
 
 ### Technical
-- Hybrid TypeScript + Rust architecture
-- WebSocket-based IPC between frontend and backend
-- Rust PTY server using portable-pty
-- Canvas/WebGL rendering support
+- Adopted a hybrid TypeScript + Rust architecture.
+- Used WebSocket-based IPC between frontend and backend.
+- Implemented a Rust PTY server using portable-pty.
+- Added Canvas/WebGL rendering support.
 
 ### Known Issues
-- First launch may take a few seconds to start the PTY server
-- On macOS, you may need to allow the binary in System Preferences → Security & Privacy
+- First launch may take a few seconds to start the PTY server.
+- On macOS, you may need to allow the binary in System Preferences > Security & Privacy.
 
 ## [Unreleased]
 
 ### Planned
-- Additional shell configurations
-- More theme options
-- Performance optimizations
-- Additional language support
+- Additional shell configurations.
+- More theme options.
+- Performance optimizations.
+- Additional language support.
 
 ---
 

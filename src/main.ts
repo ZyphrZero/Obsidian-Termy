@@ -779,7 +779,7 @@ export default class TerminalPlugin extends Plugin {
     const newScript: PresetScript = {
       id: newId,
       name: '',
-      icon: PRESET_SCRIPT_ICON_OPTIONS[0] || 'terminal',
+      icon: '',
       command: '',
       terminalTitle: '',
       showInStatusBar: true,

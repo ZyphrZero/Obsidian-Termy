@@ -412,7 +412,7 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
           const newScript: PresetScript = {
             id: this.createPresetScriptId(),
             name: '',
-            icon: PRESET_SCRIPT_ICON_OPTIONS[0] || 'terminal',
+            icon: '',
             command: '',
             terminalTitle: '',
             showInStatusBar: true,

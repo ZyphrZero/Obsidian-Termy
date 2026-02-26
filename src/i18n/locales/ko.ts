@@ -226,7 +226,7 @@ export const ko: TranslationKeys = {
       presetScriptsMoveUp: '위로 이동',
       presetScriptsMoveDown: '아래로 이동',
       presetScriptName: '스크립트 이름',
-      presetScriptNamePlaceholder: '예: Claude Code update & open',
+      presetScriptNamePlaceholder: 'Claude Code 실행',
       presetScriptIcon: '스크립트 아이콘',
       presetScriptIconPlaceholder: '예: sparkles / terminal / wand-2 / 😀 (이모지 지원)',
       presetScriptCommand: '스크립트 명령',

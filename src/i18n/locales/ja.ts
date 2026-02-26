@@ -226,7 +226,7 @@ export const ja: TranslationKeys = {
       presetScriptsMoveUp: '上へ移動',
       presetScriptsMoveDown: '下へ移動',
       presetScriptName: 'スクリプト名',
-      presetScriptNamePlaceholder: '例: Claude Code update & open',
+      presetScriptNamePlaceholder: 'Claude Codeを起動',
       presetScriptIcon: 'スクリプトアイコン',
       presetScriptIconPlaceholder: '例: sparkles / terminal / wand-2 / 😀 (絵文字対応)',
       presetScriptCommand: 'スクリプトコマンド',

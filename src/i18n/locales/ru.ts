@@ -226,7 +226,7 @@ export const ru: TranslationKeys = {
       presetScriptsMoveUp: 'Переместить вверх',
       presetScriptsMoveDown: 'Переместить вниз',
       presetScriptName: 'Название скрипта',
-      presetScriptNamePlaceholder: 'например, Claude Code update & open',
+      presetScriptNamePlaceholder: 'Запустить Claude Code',
       presetScriptIcon: 'Значок скрипта',
       presetScriptIconPlaceholder: 'например, sparkles / terminal / wand-2 / 😀 (поддерживаются эмодзи)',
       presetScriptCommand: 'Команда скрипта',
