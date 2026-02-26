@@ -1,16 +1,16 @@
 <div align="center">
 
-[中文版](./README_ZH.md)
-
 # Termy
-
-<p><i>A terminal emulator plugin for Obsidian</i></p>
 
 <img src="assets/termy.svg" width="150" />
 
-</div>
+*A terminal emulator plugin for Obsidian*
 
 Full terminal emulator with split panes, preset scripts, multiple shells, and native Rust PTY backend.
+
+English / [中文版](./README_ZH.md)
+
+</div>
 
 ## Features
 
