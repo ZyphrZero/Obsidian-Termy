@@ -1,6 +1,10 @@
 <div align="center">
 
+[中文版](./README_ZH.md)
+
 # Termy
+
+<p><i>A terminal emulator plugin for Obsidian</i></p>
 
 <img src="assets/termy.svg" width="150" />
 
@@ -29,6 +33,7 @@ Full terminal emulator with split panes, preset scripts, multiple shells, and na
   - Ctrl+F: Search
   - Ctrl+=/−/0: Zoom in/out/reset
   - Ctrl+Shift+H/J: Split horizontal/vertical
+
 ## Demo
 
 <img src="assets/ScreenShot.png" width="600" />  
@@ -36,13 +41,13 @@ Full terminal emulator with split panes, preset scripts, multiple shells, and na
 
 ## Installation
 
-### From Obsidian Community Plugins
+### Using BRAT
 
-1. Open Obsidian Settings
-2. Go to Community Plugins
-3. Search for "Termy"
-4. Click Install
-5. Enable the plugin
+1. Install [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin first
+2. Open BRAT plugin settings, click "Add beta plugin"
+3. Enter `ZyphrZero/Termy`
+4. Click "Add plugin" to complete the installation
+5. Enable the plugin in Settings → Community Plugins
 
 ### Manual Installation
 
@@ -50,28 +55,6 @@ Full terminal emulator with split panes, preset scripts, multiple shells, and na
 2. Extract the files to your vault's .obsidian/plugins/termy/ directory
 3. Reload Obsidian
 4. Enable the plugin in Settings → Community Plugins
-
-## Usage
-
-1. Press Ctrl+O or use the command palette to open a terminal
-2. The terminal will start in your vault directory by default
-3. Use the toolbar buttons or right-click menu for additional options
-
-## Configuration
-
-Access plugin settings in Obsidian Settings → Termy to configure:
-
-- Default shell and arguments
-- Font size and family
-- Cursor style and blinking
-- Theme colors
-- Background images
-- Renderer type (Canvas/WebGL)
-- Scrollback buffer size
-
-## Development
-
-See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for build instructions and development guide.
 
 ## License
 
