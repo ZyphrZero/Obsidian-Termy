@@ -32,6 +32,7 @@ export const ru: TranslationKeys = {
     initFailed: 'Не удалось инициализировать терминал: {{message}}',
     notInitialized: 'Терминал ещё не инициализирован, попробуйте позже',
     renameTerminal: 'Переименовать терминал',
+    dropHintPasteFilePath: 'Перетащите, чтобы вставить путь к файлу',
     search: {
       placeholder: 'Поиск по содержимому терминала...',
       previous: 'Предыдущий',

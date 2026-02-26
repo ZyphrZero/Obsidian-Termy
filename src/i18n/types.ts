@@ -43,6 +43,7 @@ export interface TranslationKeys {
     initFailed: string;
     notInitialized: string;
     renameTerminal: string;
+    dropHintPasteFilePath: string;
     search: {
       placeholder: string;
       previous: string;

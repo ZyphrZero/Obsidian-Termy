@@ -32,6 +32,7 @@ export const ja: TranslationKeys = {
     initFailed: 'ターミナルの初期化に失敗しました: {{message}}',
     notInitialized: 'ターミナルはまだ初期化されていません。後で再試行してください',
     renameTerminal: 'ターミナル名を変更',
+    dropHintPasteFilePath: 'ドラッグしてファイルパスを貼り付け',
     search: {
       placeholder: 'ターミナル内容を検索...',
       previous: '前へ',

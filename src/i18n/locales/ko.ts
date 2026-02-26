@@ -32,6 +32,7 @@ export const ko: TranslationKeys = {
     initFailed: '터미널 초기화에 실패했습니다: {{message}}',
     notInitialized: '터미널이 아직 초기화되지 않았습니다. 나중에 다시 시도하세요',
     renameTerminal: '터미널 이름 변경',
+    dropHintPasteFilePath: '드래그하여 파일 경로 붙여넣기',
     search: {
       placeholder: '터미널 내용 검색...',
       previous: '이전',
