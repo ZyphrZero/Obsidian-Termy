@@ -1,16 +1,16 @@
 <div align="center">
 
-[English](./README.md)
-
 # Termy
-
-<p><i>Obsidian 终端模拟器插件</i></p>
 
 <img src="assets/termy.svg" width="150" />
 
-</div>
+*Obsidian 终端模拟器插件*
 
 功能完整的终端模拟器，支持分屏、预设脚本、多 shell 和原生 Rust PTY 后端。
+
+中文版 / [English](./README.md)
+
+</div>
 
 ## 功能特性
 
