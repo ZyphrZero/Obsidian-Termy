@@ -40,10 +40,8 @@ coverage/
 .env.local
 .dev-install-config.json
 
-# Kiro
-.kiro/
-
 # ACE Tool
 .ace-tool/
 
 AGENTS.md
+llms/

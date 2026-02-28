@@ -107,13 +107,33 @@ export interface TerminalSettings {
 }
 
 /**
- * 预设脚本定义
+ * 工作流动作类型
+ */
+export type PresetWorkflowActionType = 'terminal-command' | 'obsidian-command' | 'open-external';
+
+/**
+ * 工作流动作定义
+ */
+export interface PresetWorkflowAction {
+  id: string;
+  type: PresetWorkflowActionType;
+  value: string;
+}
+
+/**
+ * 预设工作流定义
  */
 export interface PresetScript {
   id: string;
+  /** 工作流市场模板来源 ID（仅市场导入项存在） */
+  sourceTemplateId?: string;
   name: string;
   icon: string;
+  /**
+   * @deprecated 请使用 actions。该字段仅用于旧配置迁移。
+   */
   command: string;
+  actions: PresetWorkflowAction[];
   terminalTitle: string;
   showInStatusBar: boolean;
   autoOpenTerminal: boolean;
@@ -145,6 +165,13 @@ export const DEFAULT_PRESET_SCRIPTS: PresetScript[] = [
     name: 'Claude Code Open',
     icon: 'claude',
     command: 'claude',
+    actions: [
+      {
+        id: 'action-claude-code',
+        type: 'terminal-command',
+        value: 'claude',
+      },
+    ],
     terminalTitle: 'Claude Code',
     showInStatusBar: true,
     autoOpenTerminal: true,
@@ -155,6 +182,13 @@ export const DEFAULT_PRESET_SCRIPTS: PresetScript[] = [
     name: 'Codex Open',
     icon: 'openai',
     command: 'codex',
+    actions: [
+      {
+        id: 'action-codex',
+        type: 'terminal-command',
+        value: 'codex',
+      },
+    ],
     terminalTitle: 'Codex',
     showInStatusBar: true,
     autoOpenTerminal: true,
@@ -165,6 +199,13 @@ export const DEFAULT_PRESET_SCRIPTS: PresetScript[] = [
     name: 'Gemini Open',
     icon: 'google',
     command: 'gemini',
+    actions: [
+      {
+        id: 'action-gemini-cli',
+        type: 'terminal-command',
+        value: 'gemini',
+      },
+    ],
     terminalTitle: 'Gemini CLI',
     showInStatusBar: true,
     autoOpenTerminal: true,

@@ -301,6 +301,61 @@
   color: var(--text-faint);
 }
 
+.preset-workflow-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preset-workflow-action-row {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) 28px 28px 28px;
+  gap: 6px;
+  align-items: center;
+}
+
+.preset-workflow-action-type,
+.preset-workflow-action-value {
+  width: 100%;
+  height: 30px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.preset-workflow-action-value {
+  font-family: var(--font-monospace);
+}
+
+.preset-workflow-action-type:focus,
+.preset-workflow-action-value:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+.preset-workflow-action-add {
+  align-self: flex-start;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.preset-workflow-action-add:hover {
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+.preset-workflow-action-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 /* 图标选择器 */
 .preset-script-icon-selector {
   position: relative;
@@ -469,6 +524,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 8px;
 }
@@ -477,6 +533,14 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.preset-scripts-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .preset-scripts-title {

@@ -1,6 +1,6 @@
 import type { View, WorkspaceLeaf } from 'obsidian';
 import { addIcon, FileSystemAdapter, Notice, Plugin, normalizePath } from 'obsidian';
-import type { PresetScript, TerminalSettings } from './settings/settings';
+import type { PresetScript, PresetWorkflowAction, TerminalSettings } from './settings/settings';
 import { PresetScriptModal } from './ui/terminal/presetScriptModal';
 import { PRESET_SCRIPT_ICON_OPTIONS, renderPresetScriptIcon } from './ui/terminal/presetScriptIcons';
 import { DEFAULT_SETTINGS } from './settings/settings';
@@ -12,6 +12,7 @@ import { i18n, t } from './i18n';
 import { debugLog, errorLog } from './utils/logger';
 import { createTermyLogoSvg, createTermyLogoSvgMarkup, TERMY_RIBBON_ICON_ID } from './ui/icons';
 import { FeatureVisibilityManager } from './services/visibility';
+import { shell } from 'electron';
 
 // 导入终端样式
 
@@ -177,7 +178,7 @@ export default class TerminalPlugin extends Plugin {
   async loadSettings() {
     const loaded = await this.loadData();
     const presetScripts = Array.isArray(loaded?.presetScripts)
-      ? loaded.presetScripts
+      ? loaded.presetScripts.map((script: PresetScript) => this.normalizePresetScript(script))
       : DEFAULT_SETTINGS.presetScripts;
     this.settings = {
       ...DEFAULT_SETTINGS,
@@ -201,6 +202,8 @@ export default class TerminalPlugin extends Plugin {
    * 保存设置
    */
   async saveSettings() {
+    this.settings.presetScripts = (this.settings.presetScripts ?? [])
+      .map((script) => this.normalizePresetScript(script));
     await this.saveData(this.settings);
     
     // 更新调试模式
@@ -770,6 +773,57 @@ export default class TerminalPlugin extends Plugin {
     return `preset-${Date.now()}-${random}`;
   }
 
+  private createWorkflowActionId(): string {
+    const random = Math.random().toString(36).slice(2, 8);
+    return `action-${Date.now()}-${random}`;
+  }
+
+  private normalizePresetScript(script: PresetScript): PresetScript {
+    const fallbackCommand = (script.command || '').trim();
+    const sourceActions = Array.isArray(script.actions) ? script.actions : [];
+    const normalizedActions = sourceActions
+      .map((action) => this.normalizeWorkflowAction(action))
+      .filter((action) => action.value.length > 0);
+
+    if (normalizedActions.length > 0) {
+      return {
+        ...script,
+        actions: normalizedActions,
+        command: fallbackCommand,
+      };
+    }
+
+    if (!fallbackCommand) {
+      return {
+        ...script,
+        actions: [],
+        command: '',
+      };
+    }
+
+    return {
+      ...script,
+      actions: [
+        {
+          id: this.createWorkflowActionId(),
+          type: 'terminal-command',
+          value: fallbackCommand,
+        },
+      ],
+      command: fallbackCommand,
+    };
+  }
+
+  private normalizeWorkflowAction(action: PresetWorkflowAction): PresetWorkflowAction {
+    const rawType = (action?.type || '').trim();
+    const type = rawType === 'obsidian-command' || rawType === 'open-external'
+      ? rawType
+      : 'terminal-command';
+    const value = (action?.value || '').trim();
+    const id = (action?.id || '').trim() || this.createWorkflowActionId();
+    return { id, type, value };
+  }
+
   private openPresetScriptCreateModal(): void {
     const scripts = this.settings.presetScripts ?? [];
     let newId = this.createPresetScriptId();
@@ -781,6 +835,13 @@ export default class TerminalPlugin extends Plugin {
       name: '',
       icon: '',
       command: '',
+      actions: [
+        {
+          id: this.createWorkflowActionId(),
+          type: 'terminal-command',
+          value: '',
+        },
+      ],
       terminalTitle: '',
       showInStatusBar: true,
       autoOpenTerminal: true,
@@ -939,18 +1000,25 @@ export default class TerminalPlugin extends Plugin {
       return;
     }
 
-    const command = (script.command || '').trim();
-    if (!command) {
+    const normalizedScript = this.normalizePresetScript(script);
+    const actions = normalizedScript.actions;
+    if (actions.length === 0) {
       new Notice(t('notices.presetScript.emptyCommand'));
       return;
     }
 
-    let terminalView = this.getActiveTerminalView();
+    this.runWorkflowNonTerminalActions(actions);
 
-    if (script.runInNewTerminal) {
+    const terminalCommand = this.buildWorkflowTerminalCommand(actions);
+    if (!terminalCommand) {
+      return;
+    }
+
+    let terminalView = this.getActiveTerminalView();
+    if (normalizedScript.runInNewTerminal) {
       await this.activateTerminalView(this.getLeafForNewTerminal());
       terminalView = this.getActiveTerminalView();
-    } else if (script.autoOpenTerminal && !terminalView) {
+    } else if (normalizedScript.autoOpenTerminal && !terminalView) {
       await this.activateTerminalView();
       terminalView = this.getActiveTerminalView();
     }
@@ -961,14 +1029,77 @@ export default class TerminalPlugin extends Plugin {
     }
 
     const terminal = await terminalView.waitForTerminalInstance();
-    const title = (script.terminalTitle || '').trim();
+    const title = (normalizedScript.terminalTitle || '').trim();
     if (title) {
       terminal.setTitle(title);
       this.updateLeafHeader(terminalView.leaf);
     }
-    const normalizedCommand = this.normalizePresetScriptCommand(command);
+    const normalizedCommand = this.normalizePresetScriptCommand(terminalCommand);
     terminal.write(normalizedCommand);
     terminal.focus();
+  }
+
+  private buildWorkflowTerminalCommand(actions: PresetWorkflowAction[]): string {
+    return actions
+      .filter((action) => action.type === 'terminal-command')
+      .map((action) => action.value.trim())
+      .filter((value) => value.length > 0)
+      .join('\n');
+  }
+
+  private runWorkflowNonTerminalActions(actions: PresetWorkflowAction[]): void {
+    const nonTerminalActions = actions.filter((action) => action.type !== 'terminal-command');
+    for (const action of nonTerminalActions) {
+      if (action.type === 'obsidian-command') {
+        this.runObsidianCommandAction(action.value);
+        continue;
+      }
+      if (action.type === 'open-external') {
+        void this.runOpenExternalAction(action.value);
+      }
+    }
+  }
+
+  private runObsidianCommandAction(commandId: string): void {
+    const normalizedCommandId = commandId.trim();
+    if (!normalizedCommandId) {
+      throw new Error('Workflow action "obsidian-command" requires command ID');
+    }
+    const openTerminalCommandId = `${this.manifest.id}:open-terminal`;
+    if (normalizedCommandId === openTerminalCommandId || normalizedCommandId === 'open-terminal') {
+      void this.activateTerminalView();
+      return;
+    }
+
+    if (this.isTermyTerminalContextCommand(normalizedCommandId) && !this.getActiveTerminalView()) {
+      void this.activateTerminalView();
+    }
+
+    const appWithCommands = this.app as typeof this.app & {
+      commands?: {
+        executeCommandById: (id: string) => boolean;
+      };
+    };
+    if (!appWithCommands.commands) {
+      throw new Error('Obsidian command manager is unavailable');
+    }
+    const executed = appWithCommands.commands.executeCommandById(normalizedCommandId);
+    if (!executed) {
+      throw new Error(`Obsidian command cannot execute in current context: ${normalizedCommandId}`);
+    }
+  }
+
+  private isTermyTerminalContextCommand(commandId: string): boolean {
+    const prefix = `${this.manifest.id}:terminal-`;
+    return commandId.startsWith(prefix);
+  }
+
+  private async runOpenExternalAction(url: string): Promise<void> {
+    const targetUrl = url.trim();
+    if (!targetUrl) {
+      throw new Error('Workflow action "open-external" requires a URL');
+    }
+    await shell.openExternal(targetUrl);
   }
 
   private normalizePresetScriptCommand(command: string): string {

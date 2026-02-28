@@ -406,7 +406,8 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       text: t('settingsDetails.terminal.presetScriptsDesc')
     });
 
-    const addBtn = headerEl.createEl('button', { cls: 'preset-scripts-add-btn' });
+    const headerActions = headerEl.createDiv({ cls: 'preset-scripts-header-actions' });
+    const addBtn = headerActions.createEl('button', { cls: 'preset-scripts-add-btn' });
     addBtn.textContent = t('settingsDetails.terminal.presetScriptsAdd');
     addBtn.addEventListener('click', () => {
           const newScript: PresetScript = {
@@ -414,6 +415,13 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
             name: '',
             icon: '',
             command: '',
+            actions: [
+              {
+                id: this.createPresetActionId(),
+                type: 'terminal-command',
+                value: '',
+              },
+            ],
             terminalTitle: '',
             showInStatusBar: true,
             autoOpenTerminal: true,
@@ -464,7 +472,7 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       });
       contentEl.createDiv({
         cls: 'preset-script-command',
-        text: this.getPresetScriptCommandPreview(script.command)
+        text: this.getPresetScriptCommandPreview(script)
       });
 
       const actionsEl = row.createDiv({ cls: 'preset-script-actions' });
@@ -491,7 +499,7 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
       setIcon(editBtn, 'pencil');
       editBtn.setAttribute('aria-label', t('common.save'));
       editBtn.addEventListener('click', () => {
-        this.openPresetScriptModal({ ...script }, false, listEl);
+        this.openPresetScriptModal(this.clonePresetScript(script), false, listEl);
       });
 
       const deleteBtn = actionsEl.createEl('button', { cls: 'clickable-icon preset-script-delete' });
@@ -549,13 +557,47 @@ export class TerminalSettingsRenderer extends BaseSettingsRenderer {
     return `preset-${Date.now()}-${random}`;
   }
 
-  private getPresetScriptCommandPreview(command: string): string {
-    const trimmed = (command || '').trim();
-    if (!trimmed) {
+  private createPresetActionId(): string {
+    const random = Math.random().toString(36).slice(2, 8);
+    return `action-${Date.now()}-${random}`;
+  }
+
+  private clonePresetScript(script: PresetScript): PresetScript {
+    const actions = Array.isArray(script.actions)
+      ? script.actions.map((action) => ({ ...action }))
+      : [];
+    return {
+      ...script,
+      actions,
+    };
+  }
+
+  private getPresetScriptCommandPreview(script: PresetScript): string {
+    const actions = Array.isArray(script.actions) ? script.actions : [];
+    if (actions.length === 0) {
+      const trimmed = (script.command || '').trim();
+      if (!trimmed) {
+        return t('settingsDetails.terminal.presetScriptsEmptyCommand');
+      }
+      const normalizedFallback = trimmed.replace(/\r?\n/g, ' \\n ');
+      return normalizedFallback.length > 160
+        ? `${normalizedFallback.slice(0, 157)}...`
+        : normalizedFallback;
+    }
+
+    const first = actions[0];
+    const prefix = first.type === 'obsidian-command'
+      ? 'Obsidian'
+      : first.type === 'open-external'
+        ? 'URL'
+        : 'Terminal';
+    const normalized = first.value.trim().replace(/\r?\n/g, ' \\n ');
+    const suffix = actions.length > 1 ? ` (+${actions.length - 1})` : '';
+    const preview = `${prefix}: ${normalized}${suffix}`;
+    if (!normalized) {
       return t('settingsDetails.terminal.presetScriptsEmptyCommand');
     }
-    const normalized = trimmed.replace(/\r?\n/g, ' \\n ');
-    return normalized.length > 160 ? `${normalized.slice(0, 157)}...` : normalized;
+    return preview.length > 160 ? `${preview.slice(0, 157)}...` : preview;
   }
 
   /**
